@@ -1,4 +1,5 @@
 import json
+import os
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -6,15 +7,24 @@ from flask_cors import CORS
 from src.utils import request_stock_time_series, request_avalaible_symbols
 
 
-# instantiate the app
+# Set up the app and point it to Vue
 app = Flask(__name__)
 app.config.from_object(__name__)
 
+
 # enable CORS
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(
+    app,
+    resources={r"/symbol/*": {"origins": "*"}, r"/fetch_symbol/*": {"origins": "*"}},
+)
 
 
-# sanity check route
+# Set up the index route
+@app.route("/")
+def index():
+    return app.send_static_file("index.html")
+
+
 @app.route("/symbol/<symbol>", methods=["GET"])
 def request_data(symbol: str):
     time_series, statistics_informations = request_stock_time_series(symbol)
@@ -30,6 +40,8 @@ def fetch_available_symbols():
     return json.dumps({"symbolsList": symbols_list})
 
 
-@app.route("/ping", methods=["GET"])
-def ping_pong():
-    return jsonify("pong!")
+# Start the app
+if __name__ == "__main__":
+    from waitress import serve
+
+    serve(app, host="0.0.0.0", port=5000)

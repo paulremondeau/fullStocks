@@ -1,9 +1,7 @@
 <script setup>
 // TODO :
 // - se débarasser des let
-// - faire les box de stats
 // - mettre l'autocomplete
-// - mettre sur git
 // - déployer
 import { reactive, ref, onMounted, createApp } from 'vue'
 import axios from 'axios'
@@ -19,9 +17,8 @@ const dataLineChart = reactive([])
 const selectedSymbols = reactive(['AAPL', 'MSFT', 'META'])
 
 onMounted(() => {
-  // fetchAvailableSymbols()
+  // fetchAvailableSymbols() // will be used when the accordion to select the symbol will be working
   getAllTimeSeries()
-  console.log(availableSymbols)
 })
 
 function logMe() {
@@ -30,6 +27,10 @@ function logMe() {
   console.log(dataStatsTable)
 }
 
+/**
+ * Fetch the available symbols on the Twele Data API.
+ * Call the backend python on the route /fetch_symbol .
+ */
 function fetchAvailableSymbols() {
   axios
     .get(apiUrl + 'fetch_symbol')
@@ -41,21 +42,28 @@ function fetchAvailableSymbols() {
     })
 }
 
+/**
+ * Fetch the time series and stats tables of all the symbols in selectedSymbols.
+ * Add all the results in dataLineChart and dataStatsTable.
+ */
 function getAllTimeSeries() {
   for (const symbol of selectedSymbols) {
     getOneTimeSeries(symbol)
   }
 }
 
+/**
+ * Fetch the time series and stats table of the symbol we want.
+ * Add the results to dataLineChart and dataStatsTable.
+ * @param {String} symbol The symbol of the stock information we want to get
+ */
 function getOneTimeSeries(symbol) {
   axios
     .get(apiUrl + 'symbol/' + symbol)
 
     .then((res) => {
       dataLineChart.push({ name: symbol, data: res.data.timeSeries })
-      console.log(res.data.stats)
       dataStatsTable.push(res.data.stats)
-      console.log(dataLineChart)
     })
     .catch((error) => {
       console.error(error)
@@ -65,7 +73,7 @@ function getOneTimeSeries(symbol) {
 
 <template>
   <div>
-    <button @click="logMe()">logMe</button>
+    <!-- <button @click="logMe()">logMe</button> -->
     <!-- <button @click="getAllTimeSeries()">Click to actualize</button> -->
     <LineChart :dataLineChart="dataLineChart" v-if="dataLineChart.length != 0" />
     <StatsTable :tableData="dataStatsTable" v-if="dataStatsTable.length != 0"/>
