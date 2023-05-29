@@ -35,3 +35,4 @@ homework.pdf
 __pycache__
 .venv
 *.ipynb
+config.py
