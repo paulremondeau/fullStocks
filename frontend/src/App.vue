@@ -9,7 +9,8 @@ import axios from 'axios'
 import LineChart from './components/LineChart.vue'
 import StatsTable from './components/StatsTable.vue'
 
-const apiUrl = 'http://localhost:5000/'
+import apiUrl from './config.js'
+console.log(apiUrl)
 let availableSymbols = reactive([])
 const dataStatsTable = reactive([])
 const dataLineChart = reactive([])
