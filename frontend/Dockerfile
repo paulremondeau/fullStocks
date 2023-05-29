@@ -3,6 +3,7 @@ FROM node:lts-alpine
 
 #Install serve package
 RUN npm i -g serve
+
 # Set the working directory
 WORKDIR /app
 
@@ -22,4 +23,4 @@ RUN npm run build
 EXPOSE 5000
 
 # Executables
-CMD [ "npm", "run", "dev" , "--host"]
+CMD [ "npm", "run", "dev" ]
