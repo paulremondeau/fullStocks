@@ -154,10 +154,6 @@ def request_data(symbol: str):
                 new_timeseries = StockTimeSeries(symbol, stocks_date, stock_values)
                 db.session.add(new_timeseries)
 
-                # new_stats_table = StockStats(new_stats_table = StockStats(
-                #     symbol,
-                # )
-
                 db.session.commit()
 
             # PUT method

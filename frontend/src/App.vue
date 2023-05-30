@@ -32,16 +32,16 @@ function logMe() {
  * Fetch the available symbols on the Twele Data API.
  * Call the backend python on the route /fetch_symbol .
  */
-function fetchAvailableSymbols() {
-  axios
-    .get(apiUrl + 'fetch_symbol')
-    .then((res) => {
-      availableSymbols = res.data.symbolsList
-    })
-    .catch((error) => {
-      console.error(error)
-    })
-}
+// function fetchAvailableSymbols() {
+//   axios
+//     .get(apiUrl + 'fetch_symbol')
+//     .then((res) => {
+//       availableSymbols = res.data.symbolsList
+//     })
+//     .catch((error) => {
+//       console.error(error)
+//     })
+// }
 
 /**
  * Fetch the time series and stats tables of all the symbols in selectedSymbols.
@@ -97,17 +97,6 @@ function processApiResult(res) {
   }
 }
 
-  // axios
-  //   .get(apiUrl + 'symbol/' + symbol)
-
-  //   .then((res) => {
-  //     dataLineChart.push({ name: symbol, data: res.data.stockPerformance })
-  //     dataStatsTable.push(res.data.stats)
-  //   })
-  //   .catch((error) => {
-  //     console.error(error)
-  //   })
-// }
 </script>
 
 <template>

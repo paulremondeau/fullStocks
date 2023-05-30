@@ -69,10 +69,6 @@ def request_stock_time_series(
 
         working_df: pd.Series = df["close"]
 
-        # # Performance
-        # performance_df = working_df / working_df.iloc[0] * 100
-        # performance_json: Dict[str, float] = json.loads(working_df.to_json())
-
         return status, working_df
 
 
