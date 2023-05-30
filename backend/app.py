@@ -19,7 +19,7 @@ from src.utils import (
     format_sending_data,
     evaluate_stats_information,
 )
-from config import API_KEY
+from config import API_KEY, FRONTEND_URL
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -39,8 +39,8 @@ app.app_context().push()
 cors = CORS(
     app,
     resources={
-        r"/check_symbol_data/*": {"origins": "http://localhost:8080"},
-        r"/get_symbol_data/*": {"origins": "http://localhost:8080"},
+        r"/check_symbol_data/*": {"origins": FRONTEND_URL},
+        r"/get_symbol_data/*": {"origins": FRONTEND_URL},
     },
 )
 
