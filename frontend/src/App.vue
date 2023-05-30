@@ -59,17 +59,55 @@ function getAllTimeSeries() {
  * @param {String} symbol The symbol of the stock information we want to get
  */
 function getOneTimeSeries(symbol) {
-  axios
-    .get(apiUrl + 'symbol/' + symbol)
 
+  // First check if we have the data in the data base
+  // Otherwise, we'll have to fetch it from Twelve Data.
+  axios
+    .get(apiUrl + 'check_symbol_data/' + symbol)
     .then((res) => {
-      dataLineChart.push({ name: symbol, data: res.data.timeSeries })
-      dataStatsTable.push(res.data.stats)
-    })
-    .catch((error) => {
+      
+      if (res.data.dataExists) { 
+        if (res.data.dataIsFresh){
+          axios.get(apiUrl + 'get_symbol_data/' + symbol)
+          .then((res) => {
+            processApiResult(res)
+          })
+        } else {
+           axios.put(apiUrl + 'get_symbol_data/' + symbol)
+          .then((res) => {
+            processApiResult(res)
+          })
+        }
+      }
+      else {
+        axios.post(apiUrl + 'get_symbol_data/' + symbol)
+          .then((res) => {
+            processApiResult(res)
+          })
+      }
+    }).catch((error) => {
       console.error(error)
     })
 }
+
+function processApiResult(res) {
+  if (res.data.status == 'ok') {
+    dataLineChart.push({ name: res.data.symbol, data: res.data.data })
+    dataStatsTable.push(res.data.stats)
+  }
+}
+
+  // axios
+  //   .get(apiUrl + 'symbol/' + symbol)
+
+  //   .then((res) => {
+  //     dataLineChart.push({ name: symbol, data: res.data.stockPerformance })
+  //     dataStatsTable.push(res.data.stats)
+  //   })
+  //   .catch((error) => {
+  //     console.error(error)
+  //   })
+// }
 </script>
 
 <template>
