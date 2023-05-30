@@ -30,6 +30,7 @@ coverage
 # Misck
 homework.pdf
 .vscode
+db.sqlite
 
 # Python
 __pycache__

@@ -4,3 +4,6 @@ flask_cors
 pandas
 python-dateutil
 waitress
+flask-marshmallow
+flask-sqlalchemy
+marshmallow-sqlalchemy
