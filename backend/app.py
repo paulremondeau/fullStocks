@@ -1,3 +1,7 @@
+##############################################################################
+############################### Libraries ####################################
+##############################################################################
+
 import json
 import os
 import datetime
@@ -20,7 +24,10 @@ from config import API_KEY
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Set up the app and point it to Vue
+##############################################################################
+################### Set up the app and point it to Vue #######################
+##############################################################################
+
 app = Flask(__name__)
 app.config.from_object(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
@@ -38,18 +45,20 @@ cors = CORS(
     },
 )
 
+##############################################################################
+################################ Database ####################################
+##############################################################################
+
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
 
-# Database
 class StockTimeSeries(db.Model):
     symbol = db.Column(db.String(30), primary_key=True)
     dateValue = db.Column(db.PickleType())
     stockValues = db.Column(db.PickleType())
 
     def __init__(self, symbol, date_value, time_series):
-        # Add the data to the instance
         self.symbol = symbol
         self.dateValue = date_value
         self.stockValues = time_series
@@ -61,7 +70,11 @@ class StockTimeSeriesSchema(ma.Schema):
 
 
 stock_time_series_schema = StockTimeSeriesSchema(many=True)
-# stock_stats_schema = StockStatsSchema(many=True)
+db.create_all()
+
+##############################################################################
+################################# Routes #####################################
+##############################################################################
 
 
 @app.route("/check_symbol_data/<symbol>", methods=["GET"])
