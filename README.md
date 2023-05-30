@@ -1,4 +1,4 @@
-# A full stack API for stocks information
+# A web application for stocks information
 This repo contains a full-stack web-application for visualize various stock information.
 
 The backend is made in Python using Flask.
