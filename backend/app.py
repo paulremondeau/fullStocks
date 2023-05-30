@@ -16,7 +16,6 @@ from flask_cors import CORS
 
 from src.utils import (
     request_stock_time_series,
-    request_avalaible_symbols,
     format_sending_data,
     evaluate_stats_information,
 )
@@ -40,8 +39,8 @@ app.app_context().push()
 cors = CORS(
     app,
     resources={
-        r"/check_symbol_data/*": {"origins": "*"},
-        r"/get_symbol_data/*": {"origins": "*"},
+        r"/check_symbol_data/*": {"origins": "http://localhost:8080"},
+        r"/get_symbol_data/*": {"origins": "http://localhost:8080"},
     },
 )
 
@@ -177,21 +176,6 @@ def request_data(symbol: str):
             "status": status,
         }
     )
-
-
-# @app.route("/symbol/<symbol>", methods=["GET"])
-# def request_data(symbol: str):
-#     time_series, statistics_informations = request_stock_time_series(symbol, API_KEY)
-#     times_series = [
-#         [int(index), float(f"{value:.2f}")] for index, value in time_series.items()
-#     ]
-#     return json.dumps({"stockValues": times_series, "stats": statistics_informations})
-
-
-# @app.route("/fetch_symbol", methods=["GET"])
-# def fetch_available_symbols():
-#     symbols_list = request_avalaible_symbols(API_KEY)
-#     return json.dumps({"symbolsList": symbols_list})
 
 
 # Start the app
