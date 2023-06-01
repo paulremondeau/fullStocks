@@ -17,6 +17,8 @@ PARAMS_TIMESERIES = {
 URL_SYMBOLS = "https://api.twelvedata.com/stocks"
 PARAMS_SYMBOLS = {"format": "json"}
 
+URL_MARKET_STATE = "https://api.twelvedata.com/market_state"
+
 
 def request_stock_time_series(
     symbol: str, api_key: str
@@ -197,3 +199,10 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
     }
 
     return json_stats
+
+
+def get_markets_state(api_key: str) -> pd.DataFrame:
+    params = {"apikey": api_key}
+    response = requests.get(URL_MARKET_STATE, params=params)
+
+    return

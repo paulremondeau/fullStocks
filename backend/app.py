@@ -62,7 +62,7 @@ ma = Marshmallow(app)
 
 
 class StockTimeSeries(db.Model):
-    symbol = db.Column(db.String(30), primary_key=True)
+    symbol = db.Column(db.String(10), primary_key=True)
     dateValue = db.Column(db.PickleType())
     stockValues = db.Column(db.PickleType())
 
@@ -77,7 +77,27 @@ class StockTimeSeriesSchema(ma.Schema):
         fields = ("symbol", "dateValue", "stockValues")
 
 
-stock_time_series_schema = StockTimeSeriesSchema(many=True)
+class MarketState(db.Model):
+    name = db.Column(db.String(10), primary_key=True)
+    country = db.Column(db.String(30))
+    is_market_open = db.Column(db.Boolean)
+    time_to_open = db.Column(db.DateTime)
+    date_check = db.Column(db.DateTime)
+
+    def __init__(self, name, country, is_market_open, time_to_open, date_check):
+        self.name = name
+        self.country = country
+        self.is_market_open = is_market_open
+        self.time_to_open = time_to_open
+        self.date_check = date_check
+
+
+class MarketStateSchema(ma.Schema):
+    class Meta:
+        fields = ("name", "country", "isMarketOpen", "timeToOpen", "dateCheck")
+
+
+# stock_time_series_schema = StockTimeSeriesSchema(many=True)
 db.create_all()
 
 # =================================================================================================
@@ -113,6 +133,22 @@ def check_data_symbol(symbol: str) -> Dict[str, str]:
         response["dataIsFresh"] = time_delta <= datetime.timedelta(days=1)
 
     return response
+
+
+@app.route("/check_market_state/<symbol>", methods=["PUT"])
+def check_market_state(symbol: str) -> Dict[str, str]:
+    """Check the states of the market
+
+    This function verifies if the markets are open.
+    Update information in the database.
+
+    Returns
+    -------
+    ...
+        ...
+    """
+
+    return
 
 
 @app.route("/get_symbol_data/<symbol>", methods=["POST", "GET", "PUT"])

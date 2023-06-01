@@ -1,0 +1,4 @@
+0. Check if market open
+1. Select other stock
+2. Choose other frequency
+3. Custom interface with css
