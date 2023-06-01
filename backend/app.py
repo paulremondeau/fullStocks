@@ -121,7 +121,8 @@ def check_data_symbol(symbol: str) -> Dict[str, str]:
         The dict with response information
     """
     logger.info(f"Starting function check_data_symbol({symbol})...")
-    data_symbol = StockTimeSeries.query.get(symbol)
+    data_symbol = db.session.get(StockTimeSeries, symbol)
+    # data_symbol = StockTimeSeries.query.get(symbol)
     if data_symbol is None:
         response = {"dataExists": False}
         logger.info(f"No data found for symbol {symbol}.")
@@ -170,7 +171,7 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
 
     # GET method
     if method == "GET":
-        stock_time_series_symbol_data = StockTimeSeries.query.get(symbol)
+        stock_time_series_symbol_data = db.session.get(StockTimeSeries, symbol)
         if stock_time_series_symbol_data is None:
             logger.warning(
                 f"No data in database for symbol {symbol} with method {method}."
@@ -200,7 +201,7 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
             logger.warning(
                 f"Fetching data for symbol {symbol} with method {method} from Twelve data API failed."
             )
-            logger.v(f"Request is KO. Returning None.")
+            logger.warning(f"Request is KO. Returning None.")
             status = "ko"
             stocks_date = None
             stock_values = None
@@ -226,7 +227,7 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
             # PUT method
             elif method == "PUT":
                 logger.info(f"Fetching data for symbol {symbol} in database... ")
-                old_timeseries = StockTimeSeries.query.get(symbol)
+                old_timeseries = db.session.get(StockTimeSeries, symbol)
                 if (
                     old_timeseries is None
                 ):  # TODO : unnecessary, should be removed after further testing...
