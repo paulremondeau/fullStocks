@@ -13,5 +13,8 @@ RUN pip3 install -r requirements.txt
 # Copy the files
 COPY . .
 
+# Create logs file
+RUN touch logs/app_logs.log
+
 # Executable commands
 CMD [ "python3", "app.py"]
