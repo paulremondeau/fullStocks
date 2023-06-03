@@ -4,6 +4,7 @@ from copy import copy
 from typing import List, Tuple, Dict
 
 import pandas as pd
+import datetime
 from dateutil.relativedelta import relativedelta
 
 
@@ -201,8 +202,40 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
     return json_stats
 
 
-def get_markets_state(api_key: str) -> pd.DataFrame:
+def get_markets_state(api_key: str) -> Tuple[str, pd.DataFrame]:
+    """Retrieves market state from Twelve Data API.
+
+    If request fails (not enough token), status is "ko"
+    and df is None.
+    If request succeds, status is "ok" and df contains the dataframe
+    with columns name, country, is_market_open, time_to_open, time_to_close, time_after_open, date_check.
+
+    Parameters
+    ----------
+    api_key : str
+        API key for the Tweleve Data API.
+
+    Returns
+    -------
+    Tuple[str, pd.DataFrame]
+        status and data.
+    """
     params = {"apikey": api_key}
     response = requests.get(URL_MARKET_STATE, params=params)
 
-    return
+    data = response.json()
+    if isinstance(data, dict):
+        # Request failed
+        status = "ko"
+        df = None
+
+    else:
+        status = "ok"
+        df = pd.DataFrame(data).drop(columns=["code"]).drop_duplicates()
+        df[["time_to_open", "time_to_close", "time_after_open"]] = df[
+            ["time_to_open", "time_to_close", "time_after_open"]
+        ].apply(pd.to_timedelta)
+        df["date_check"] = datetime.datetime.now()
+        df.rename({"name": "exchange"}, axis=1, inplace=True)
+
+    return status, df

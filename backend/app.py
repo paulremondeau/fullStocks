@@ -32,6 +32,7 @@ from src.utils import (
     request_stock_time_series,
     format_sending_data,
     evaluate_stats_information,
+    get_markets_state,
 )
 from config import API_KEY, FRONTEND_URL
 
@@ -65,6 +66,7 @@ cors = CORS(
     resources={
         r"/check_symbol_data/*": {"origins": FRONTEND_URL},
         r"/get_symbol_data/*": {"origins": FRONTEND_URL},
+        r"/check_market_state/*": {"origins": FRONTEND_URL},
     },
 )
 logger.info("Backend server initialized.")
@@ -93,23 +95,34 @@ class StockTimeSeriesSchema(ma.Schema):
 
 
 class MarketState(db.Model):
-    name = db.Column(db.String(10), primary_key=True)
+    exchange = db.Column(db.String(10), primary_key=True)
     country = db.Column(db.String(30))
     is_market_open = db.Column(db.Boolean)
-    time_to_open = db.Column(db.DateTime)
+    time_to_open = db.Column(db.PickleType())
+    time_to_close = db.Column(db.PickleType())
     date_check = db.Column(db.DateTime)
 
-    def __init__(self, name, country, is_market_open, time_to_open, date_check):
-        self.name = name
+    def __init__(
+        self, exchange, country, is_market_open, time_to_open, time_to_close, date_check
+    ):
+        self.exchange = exchange
         self.country = country
         self.is_market_open = is_market_open
         self.time_to_open = time_to_open
+        self.time_to_close = time_to_close
         self.date_check = date_check
 
 
 class MarketStateSchema(ma.Schema):
     class Meta:
-        fields = ("name", "country", "isMarketOpen", "timeToOpen", "dateCheck")
+        fields = (
+            "exchange",
+            "country",
+            "isMarketOpen",
+            "timeToOpen",
+            "timeToClose",
+            "dateCheck",
+        )
 
 
 # stock_time_series_schema = StockTimeSeriesSchema(many=True)
@@ -159,8 +172,8 @@ def check_data_symbol(symbol: str) -> Dict[str, str]:
     return response
 
 
-@app.route("/check_market_state/<symbol>", methods=["PUT"])
-def check_market_state(symbol: str) -> Dict[str, str]:
+@app.route("/check_market_state", methods=["GET"])
+def check_market_state() -> Dict[str, str]:
     """Check the states of the market
 
     This function verifies if the markets are open.
@@ -171,8 +184,70 @@ def check_market_state(symbol: str) -> Dict[str, str]:
     ...
         ...
     """
+    method = request.method
+    logger.info(f"Starting function check_market_state()...")
+    logger.info(f"Method: {method}")
+    status = "ok"
 
-    return
+    logger.info(f"Fetching data from Twelve data API...")
+    twelve_data_status, data_market = get_markets_state(API_KEY)
+    if twelve_data_status == "ko":
+        logger.warning(f"Fetching data from Twelve data API failed.")
+        status = "ko"
+        result = None
+
+    else:
+        logger.info(f"Fetching data from Twelve data API succeded !")
+        for data_exchange in data_market.iloc:
+            exchange = data_exchange["exchange"]
+
+            logger.info(f"Processing data for exchange {exchange}...")
+            country = data_exchange["country"]
+            is_market_open = data_exchange["is_market_open"]
+            time_to_open = data_exchange["time_to_open"]
+            time_to_close = data_exchange["time_to_close"]
+            date_check = data_exchange["date_check"]
+
+            logger.info(f"Checking if exchange {exchange} exists in database...")
+            old_exchange_data = db.session.get(MarketState, exchange)
+            if old_exchange_data is None:
+                logger.info(f"No data for exchange {exchange} in database.")
+                logger.info(f"Adding data for {exchange} to database...")
+                new_exchange_data = MarketState(
+                    exchange,
+                    country,
+                    is_market_open,
+                    time_to_open,
+                    time_to_close,
+                    date_check,
+                )
+                db.session.add(new_exchange_data)
+                db.session.commit()
+                logger.info(f"Data for {exchange} added to database !")
+
+            else:
+                logger.info(f"Data for exchange {exchange} found in database.")
+                logger.info(f"Updating data for {exchange} in database...")
+                old_exchange_data.country = country
+                old_exchange_data.isMarketOpen = is_market_open
+                old_exchange_data.timeToOpen = time_to_open
+                old_exchange_data.timeToClose = time_to_close
+                old_exchange_data.dateCheck = date_check
+
+                db.session.commit()
+                logger.info(f"Data for exchange {exchange} updated in database !")
+
+    data_market.rename(
+        {
+            "time_to_open": "timeToOpen",
+            "time_to_close": "timeToClose",
+            "is_market_open": "isMarketOpen",
+        },
+        axis=1,
+        inplace=True,
+    )
+    result_data = [json.loads(x.to_json()) for x in data_market.iloc]
+    return json.dumps({"status": status, "data": result_data})
 
 
 @app.route("/get_symbol_data/<symbol>", methods=["POST", "GET", "PUT"])

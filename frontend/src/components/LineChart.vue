@@ -11,6 +11,7 @@ const data = reactive({
   chartOptions: {
     chart: {
       height: 350,
+      width: 500,
       type: 'line',
       zoom: {
         type: 'x',
@@ -52,8 +53,8 @@ function logMe() {
   <!-- <button @click="logMe()">logMe</button> -->
   <VueApexCharts
     type="line"
-    height="500"
-    width="1000"
+    height="700"
+    width="100%"
     :options="data.chartOptions"
     :series="data.series"
   ></VueApexCharts>
