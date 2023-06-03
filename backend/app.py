@@ -34,7 +34,7 @@ from src.utils import (
     evaluate_stats_information,
     get_markets_state,
 )
-from config import API_KEY, FRONTEND_URL
+from config import API_KEY, FRONTEND_URL, API_PLAN
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -77,9 +77,13 @@ logger.info("Backend server initialized.")
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
+SYMBOL_LENGTH = 20
+EXCHANGE_LENGTH = 30
+COUNTRY_LENGTH = 30
+
 
 class StockTimeSeries(db.Model):
-    symbol = db.Column(db.String(10), primary_key=True)
+    symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
     dateValue = db.Column(db.PickleType())
     stockValues = db.Column(db.PickleType())
 
@@ -95,8 +99,8 @@ class StockTimeSeriesSchema(ma.Schema):
 
 
 class MarketState(db.Model):
-    exchange = db.Column(db.String(10), primary_key=True)
-    country = db.Column(db.String(30))
+    exchange = db.Column(db.String(EXCHANGE_LENGTH), primary_key=True)
+    country = db.Column(db.String(COUNTRY_LENGTH))
     is_market_open = db.Column(db.Boolean)
     time_to_open = db.Column(db.PickleType())
     time_to_close = db.Column(db.PickleType())
@@ -125,7 +129,23 @@ class MarketStateSchema(ma.Schema):
         )
 
 
-# stock_time_series_schema = StockTimeSeriesSchema(many=True)
+class SymbolExchange(db.model):
+    symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
+    exchange = db.Column(db.String(EXCHANGE_LENGTH))
+
+    def __init__(self, symbol, exchange):
+        self.symbol = symbol
+        self.exchange = exchange
+
+
+class SymbolExchangeSchema(ma.Schema):
+    class Meta:
+        fields = (
+            "symbol",
+            "exchange",
+        )
+
+
 db.create_all()
 
 logger.info("Database initialized.")

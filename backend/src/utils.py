@@ -16,7 +16,6 @@ PARAMS_TIMESERIES = {
 }
 
 URL_SYMBOLS = "https://api.twelvedata.com/stocks"
-PARAMS_SYMBOLS = {"format": "json"}
 
 URL_MARKET_STATE = "https://api.twelvedata.com/market_state"
 
@@ -75,28 +74,26 @@ def request_stock_time_series(
         return status, working_df
 
 
-def request_avalaible_symbols(
-    api_key: str, exchange: List[str] = ["NASDAQ"]
-) -> List[str]:
-    """Fetch the available symbols list.
+def get_stocks_list(api_key: str, exchanges: List[str]) -> List[str]:
+    """Fetch the available stocks list.
 
     This function fetch the twelvedata API to get
-    the symbols of the instruments exchanged on
-    specifics exchange place.
+    the symbols of the stocks available on the API.
+    Note : the available stocks depends on your Twelve
+    Data bill plan.
 
     Parameters
     ----------
-    exchange : List[str], optional
-        List of the exchanges place to fetch, by default ["NASDAQ"]
+    exchanges : List[str]
+        List of the exchanges needed.
 
     Returns
     -------
     List[str]
         The symbols list
     """
-    params = copy(PARAMS_SYMBOLS)
-    if exchange:
-        params["exchange"] = exchange
+    params = {"apikey": api_key}
+    params["exchange"] = exchanges
     params["apikey"] = api_key
     response = requests.get(URL_SYMBOLS, params=params)
 
