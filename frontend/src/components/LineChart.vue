@@ -2,10 +2,12 @@
 import { reactive } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 
+///// Props /////
 const props = defineProps({
   dataLineChart: Object
 })
 
+///// States /////
 const data = reactive({
   series: props.dataLineChart,
   chartOptions: {

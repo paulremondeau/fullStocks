@@ -16,99 +16,93 @@
 </template>
 
 <script setup>
-
-// TODO : régler le prolbème du timer -> utilisation de pinia ?
-// Voir comment régler le problème du enable
-// Voir si il faudrait passer par le parent
-
 import {reactive, ref, watch, computed} from 'vue'
-import { Duration } from "luxon";
+import {Duration} from "luxon";
+import {storeToRefs} from 'pinia'
 
-const props = defineProps({
-  marketData: Object
-})
+///// Stores /////
+import {useTimerMarketStore} from '@/stores/timermarket'
+const timerMarket = useTimerMarketStore() 
+const {timerValue} = storeToRefs(timerMarket)
 
-// Emit event : if one timer comes to 0 -> trigger the API call
-const emit = defineEmits(["updateMarket"])
+///// States /////
+const emitUpdateMarket = ref(false)
 
 // For the Caroussel
 const nomberOfExhanges = computed(() => 
     props.marketData.length
 )
 
-// Timer for the countdown before open/close
-const timerEnabled = ref(true)
-const timerCount = ref(0)
-function increaseTimer() {
-    if (timerEnabled.value) {
-    setTimeout(() => {
-        timerCount.value += 1;
-    }, 1000);
-    }
-}
-increaseTimer()
 
-
-// async function updateTimers() {
-//     for (const exchangeData of props.marketData){
-//         updateTimer(exchangeData)
-//     }
-// }
-
-// function updateTimer(exchangeData) {
-//     let indexData = props.marketData.indexOf(exchangeData)
-//     if (exchangeData.isMarketOpen) {     
-//         exchangeData.timeToClose -= 1000;
-//         if (exchangeData.timeToClose < 0){
-//             emit('updateMarket')
-//             return
-//         } else {    
-//         props.marketData[indexData] = exchangeData
-//         }
-//     } else {
-//         exchangeData.timeToOpen -= 1000;
-//         if (exchangeData.timeToOpen < 0){
-//             emit('updateMarket')
-//             return
-//         } else {
-//         props.marketData[indexData] = exchangeData
-//         }
-//     }
-// }
-
-
-// Timer decreasing event
-watch(timerCount, increaseTimer)
-watch(timerCount, () => {
-    for (const exchangeData of props.marketData){
-        let indexData = props.marketData.indexOf(exchangeData)
-        if (exchangeData.isMarketOpen) {     
-            exchangeData.timeToClose -= 1000;
-            if (exchangeData.timeToClose < 0){
-                timerEnabled.value = false
-                emit('updateMarket')
-                return
-            } else {
-            props.marketData[indexData] = exchangeData
-            }
-        } else {
-            exchangeData.timeToOpen -= 1000;
-            if (exchangeData.timeToOpen < 0){
-                timerEnabled.value = false
-                emit('updateMarket')
-                return
-            } else {
-            props.marketData[indexData] = exchangeData
-            }
-        }
-    }
-})
-
-// Open or Close style
+///// Functions /////
+/**
+ * Switch class between open or close
+ * @param {Object} exchangeData Exchange market data informations.
+ */
 function openOrClose (exchangeData) {
     return exchangeData.isMarketOpen ? 'open' : 'close'
 }
 
+/**
+ * Update the time displayed under exchange markets information.
+ * @return {Promise} A promise to make sure all data are updated and only one emit will trigger.
+ */
+function updateTimerMarket(){
+    return new Promise((resolve, reject) => {
+        if (!emitUpdateMarket.value) {
+             for (const exchangeData of props.marketData){
+            let indexData = props.marketData.indexOf(exchangeData)
+            if (exchangeData.isMarketOpen) {     
+                exchangeData.timeToClose -= 1000;
+                if (exchangeData.timeToClose < 0){
+                    timerMarket.disable()
+                    emitUpdateMarket.value = true
+                    
+                } else {
+                props.marketData[indexData] = exchangeData
+                }
+            } else {
+                exchangeData.timeToOpen -= 1000;
+                if (exchangeData.timeToOpen < 0){
+                    timerMarket.disable()
+                    emitUpdateMarket.value = true
+                    
+                } else {
+                props.marketData[indexData] = exchangeData
+                }
+            }
+        }
+    } else {
+        emitUpdateMarket.value = false
+    }
+    // It's to make sure we will only trigger one emit
+    resolve()
+    })
+}
+
+
+///// Props /////
+const props = defineProps({
+  /**
+   * The markets data.
+   */
+  marketData: Object
+})
+
+///// Emits /////
+const emit = defineEmits(["updateMarket"])
+
+// Timer decreasing event
+watch(timerValue, timerMarket.increment)
+watch(timerValue, () => {
+    updateTimerMarket()
+        .then((res) => {
+            if (emitUpdateMarket.value) {
+                emit('updateMarket')
+            }
+        })
+    }
+)
 </script>
 
 

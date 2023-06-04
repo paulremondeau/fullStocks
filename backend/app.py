@@ -230,18 +230,18 @@ def check_market_state() -> Dict[str, str]:
         for data_exchange in data_market.iloc:
             exchange = data_exchange["exchange"]
 
-            logger.info(f"Processing data for exchange {exchange}...")
+            # logger.info(f"Processing data for exchange {exchange}...")
             country = data_exchange["country"]
             isMarketOpen = data_exchange["isMarketOpen"]
             timeToOpen = data_exchange["timeToOpen"]
             timeToClose = data_exchange["timeToClose"]
             dateCheck = data_exchange["dateCheck"]
 
-            logger.info(f"Checking if exchange {exchange} exists in database...")
+            # logger.info(f"Checking if exchange {exchange} exists in database...")
             old_exchange_data = db.session.get(MarketState, exchange)
             if old_exchange_data is None:
-                logger.info(f"No data for exchange {exchange} in database.")
-                logger.info(f"Adding data for {exchange} to database...")
+                # logger.info(f"No data for exchange {exchange} in database.")
+                # logger.info(f"Adding data for {exchange} to database...")
                 new_exchange_data = MarketState(
                     exchange,
                     country,
@@ -252,11 +252,11 @@ def check_market_state() -> Dict[str, str]:
                 )
                 db.session.add(new_exchange_data)
                 db.session.commit()
-                logger.info(f"Data for {exchange} added to database !")
+                # logger.info(f"Data for {exchange} added to database !")
 
             else:
-                logger.info(f"Data for exchange {exchange} found in database.")
-                logger.info(f"Updating data for {exchange} in database...")
+                # logger.info(f"Data for exchange {exchange} found in database.")
+                # logger.info(f"Updating data for {exchange} in database...")
                 old_exchange_data.country = country
                 old_exchange_data.isMarketOpen = isMarketOpen
                 old_exchange_data.timeToOpen = timeToOpen
@@ -264,10 +264,11 @@ def check_market_state() -> Dict[str, str]:
                 old_exchange_data.dateCheck = dateCheck
 
                 db.session.commit()
-                logger.info(f"Data for exchange {exchange} updated in database !")
+                # logger.info(f"Data for exchange {exchange} updated in database !")
 
         result_data = [json.loads(x.to_json()) for x in data_market.iloc]
 
+    logger.info(f"Function check_market_state() finished !")
     return json.dumps({"status": status, "data": result_data})
 
 
