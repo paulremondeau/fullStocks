@@ -162,6 +162,7 @@ $slideWidth: 100px;
 		height: $sliderHeight;
 		width: $slideWidth;
         line-height: 25px;
+        text-align: center;
 
             h1 {
                     font-size: 25px;
