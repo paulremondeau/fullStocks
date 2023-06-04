@@ -1,3 +1,13 @@
+<template>
+  <div class="home">
+    <button @click="logMe()">logMe</button>
+    <!-- <button @click="getMarketState()">Click to actualize</button> -->
+    <MarketState :marketData="marketData" v-if="marketData.length != 0" @updateMarket="getMarketState()"/>
+    <LineChart :dataLineChart="dataLineChart" v-if="dataLineChart.length != 0" />
+    <StatsTable :tableData="dataStatsTable" v-if="dataStatsTable.length != 0"/>
+  </div>
+</template>
+
 <script setup>
 // TODO :
 // - se débarasser des let
@@ -10,13 +20,11 @@ import StatsTable from '../components/StatsTable.vue'
 import MarketState from '../components/MarketState.vue'
 
 import apiUrl from '../../config.js'
-console.log(apiUrl)
-let availableSymbols = reactive([])
+
+
 const dataStatsTable = reactive([])
 const dataLineChart = reactive([])
 const marketData = reactive([])
-
-
 const selectedSymbols = reactive(['AAPL', 'MSFT', 'META'])
 
 onMounted(() => {
@@ -25,37 +33,16 @@ onMounted(() => {
 })
 
 function getMarketState() {
-
   axios
     .get(apiUrl + "check_market_state")
     .then((res) => {
       if (res.data.status == 'ok') {
-        marketData.lenght = 0
-        marketData.push(...res.data.data)
+        
+        Object.assign(marketData, res.data.data) 
       }
     })
 
 }
-
-function logMe() {
-  console.log(marketData)
-
-}
-
-/**
- * Fetch the available symbols on the Twele Data API.
- * Call the backend python on the route /fetch_symbol .
- */
-// function fetchAvailableSymbols() {
-//   axios
-//     .get(apiUrl + 'fetch_symbol')
-//     .then((res) => {
-//       availableSymbols = res.data.symbolsList
-//     })
-//     .catch((error) => {
-//       console.error(error)
-//     })
-// }
 
 /**
  * Fetch the time series and stats tables of all the symbols in selectedSymbols.
@@ -75,7 +62,12 @@ function getAllTimeSeries() {
 function getOneTimeSeries(symbol) {
 
   // First check if we have the data in the data base
-  // Otherwise, we'll have to fetch it from Twelve Data.
+  // - if data is in the database :
+  //    - if data is fresh in database, get data from databse
+  //    - if data is not fresh in database :
+  //        - if exchange market is open, fetch Twelve Data API
+  //        - if exchange market is close, get data from database
+  // - if data is not in the database, fetch Twelve Data API
   axios
     .get(apiUrl + 'check_symbol_data/' + symbol)
     .then((res) => {
@@ -87,10 +79,18 @@ function getOneTimeSeries(symbol) {
             processApiResult(res)
           })
         } else {
-           axios.put(apiUrl + 'get_symbol_data/' + symbol)
+          if (res.data.isMarketOpen) {
+            axios.put(apiUrl + 'get_symbol_data/' + symbol)
           .then((res) => {
             processApiResult(res)
           })
+          } else {
+            axios.get(apiUrl + 'get_symbol_data/' + symbol)
+          .then((res) => {
+            processApiResult(res)
+          })
+          }
+  
         }
       }
       else {
@@ -111,19 +111,13 @@ function processApiResult(res) {
   }
 }
 
+function logMe() {
+  console.log(marketData)
+
+}
 </script>
 
-<template>
-  
-  <div class="home">
-    <!-- <button @click="logMe()">logMe</button> -->
-    <!-- <button @click="getMarketState()">Click to actualize</button> -->
-    <MarketState :marketData="marketData" v-if="marketData.length != 0"/>
-    <LineChart :dataLineChart="dataLineChart" v-if="dataLineChart.length != 0" />
-    <StatsTable :tableData="dataStatsTable" v-if="dataStatsTable.length != 0"/>
-    
-  </div>
-</template>
+
 
 
 <style scoped>
@@ -134,6 +128,4 @@ function processApiResult(res) {
     text-align: center;
 
 }
-
-
 </style>

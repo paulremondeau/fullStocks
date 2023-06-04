@@ -1,91 +1,116 @@
+<template>
+    <div class="slider" >
+        <div class="slide-track" v-for="index in 3" :key="index">
+            <div class="slide" v-for="exchangeData in marketData">
+                <h1> {{exchangeData.exchange}} </h1>
+                <span :class="openOrClose(exchangeData)"> 
+                    {{exchangeData.isMarketOpen ? "OPEN" : "CLOSE"}} 
+                </span>
+                <h2> 
+                    {{exchangeData.isMarketOpen ? Duration.fromMillis(exchangeData.timeToClose).toFormat("hh:mm:ss")
+                    : Duration.fromMillis(exchangeData.timeToOpen).toFormat("hh:mm:ss")}} 
+                </h2>
+            </div>
+        </div>
+    </div>
+</template>
+
 <script setup>
 
-import {reactive, ref, watch, computed} from 'vue'
+// TODO : régler le prolbème du timer -> utilisation de pinia ?
+// Voir comment régler le problème du enable
+// Voir si il faudrait passer par le parent
 
+import {reactive, ref, watch, computed} from 'vue'
 import { Duration } from "luxon";
 
 const props = defineProps({
   marketData: Object
 })
 
+// Emit event : if one timer comes to 0 -> trigger the API call
+const emit = defineEmits(["updateMarket"])
+
+// For the Caroussel
 const nomberOfExhanges = computed(() => 
     props.marketData.length
 )
 
 // Timer for the countdown before open/close
+const timerEnabled = ref(true)
 const timerCount = ref(0)
-
 function increaseTimer() {
-        setTimeout(() => {
-            timerCount.value += 1000;
-        }, 1000);
-}
-
-increaseTimer()
-
-function decreaseTimer() {
-
-    for (const exchangeData of marketData){
-        let indexData = marketData.indexOf(exchangeData)
-        console.log(exchangeData)
-        if (exchangeData.isMarketOpen) {
-                if (exchangeData.timeToClose > 0) {
-                    setTimeout(() => {
-                        
-                        exchangeData.timeToClose -= 1000;
-                        marketData[indexData] = exchangeData
-                    }, 1000);
-                }
-      
-        } else {
-            if (exchangeData.timeToOpen > 0) {
-                    setTimeout(() => {
-                        exchangeData.timeToOpen -= 1000;
-                        marketData[indexData] = exchangeData
-                    }, 1000);
-                }
-        }
+    if (timerEnabled.value) {
+    setTimeout(() => {
+        timerCount.value += 1;
+    }, 1000);
     }
 }
+increaseTimer()
 
+
+// async function updateTimers() {
+//     for (const exchangeData of props.marketData){
+//         updateTimer(exchangeData)
+//     }
+// }
+
+// function updateTimer(exchangeData) {
+//     let indexData = props.marketData.indexOf(exchangeData)
+//     if (exchangeData.isMarketOpen) {     
+//         exchangeData.timeToClose -= 1000;
+//         if (exchangeData.timeToClose < 0){
+//             emit('updateMarket')
+//             return
+//         } else {    
+//         props.marketData[indexData] = exchangeData
+//         }
+//     } else {
+//         exchangeData.timeToOpen -= 1000;
+//         if (exchangeData.timeToOpen < 0){
+//             emit('updateMarket')
+//             return
+//         } else {
+//         props.marketData[indexData] = exchangeData
+//         }
+//     }
+// }
+
+
+// Timer decreasing event
 watch(timerCount, increaseTimer)
 watch(timerCount, () => {
     for (const exchangeData of props.marketData){
         let indexData = props.marketData.indexOf(exchangeData)
         if (exchangeData.isMarketOpen) {     
             exchangeData.timeToClose -= 1000;
+            if (exchangeData.timeToClose < 0){
+                timerEnabled.value = false
+                emit('updateMarket')
+                return
+            } else {
             props.marketData[indexData] = exchangeData
+            }
         } else {
             exchangeData.timeToOpen -= 1000;
+            if (exchangeData.timeToOpen < 0){
+                timerEnabled.value = false
+                emit('updateMarket')
+                return
+            } else {
             props.marketData[indexData] = exchangeData
+            }
         }
     }
 })
 
+// Open or Close style
 function openOrClose (exchangeData) {
     return exchangeData.isMarketOpen ? 'open' : 'close'
 }
 
 </script>
 
-<template>
-    
-<div class="slider" >
-	<div class="slide-track" v-for="index in 3" :key="index">
-		<div class="slide" v-for="exchangeData in marketData">
-			<h1> {{exchangeData.exchange}} </h1>
-            <span :class="openOrClose(exchangeData)"> 
-                {{exchangeData.isMarketOpen ? "OPEN" : "CLOSE"}} 
-            </span>
-            <h2> 
-                {{exchangeData.isMarketOpen ? Duration.fromMillis(exchangeData.timeToClose).toFormat("hh:mm:ss")
-                : Duration.fromMillis(exchangeData.timeToOpen).toFormat("hh:mm:ss")}} 
-            </h2>
-		</div>
-	</div>
-</div>
-
-</template>
 
 <style scoped lang="scss">
 

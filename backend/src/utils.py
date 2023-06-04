@@ -36,8 +36,9 @@ def request_stock_time_series(
 
     Returns
     -------
-    Tuple[str, Dict, Dict[str, Dict[str, float]]]
+    Tuple[str, str, Dict, Dict[str, Dict[str, float]]]
         The str is the twelve data API call status.
+        The second str is the exchange.
         The first dictionnary is the time series data.
         The second dictionnary contains the statistics data.
     """
@@ -56,6 +57,7 @@ def request_stock_time_series(
 
     elif status == "ok":
         # Convert to dataframe for easier manipulation
+        exchange = response.json()["meta"]["exchange"]
         df = pd.DataFrame(response.json()["values"])
         df = df.astype(
             {
@@ -71,7 +73,7 @@ def request_stock_time_series(
 
         working_df: pd.Series = df["close"]
 
-        return status, working_df
+        return status, exchange, working_df
 
 
 def get_stocks_list(api_key: str, exchanges: List[str]) -> List[str]:
@@ -233,6 +235,16 @@ def get_markets_state(api_key: str) -> Tuple[str, pd.DataFrame]:
             ["time_to_open", "time_to_close", "time_after_open"]
         ].apply(pd.to_timedelta)
         df["date_check"] = datetime.datetime.now()
-        df.rename({"name": "exchange"}, axis=1, inplace=True)
+        df.rename(
+            {
+                "name": "exchange",
+                "time_to_open": "timeToOpen",
+                "time_to_close": "timeToClose",
+                "is_market_open": "isMarketOpen",
+                "date_check": "dateCheck",
+            },
+            axis=1,
+            inplace=True,
+        )
 
     return status, df

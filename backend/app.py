@@ -84,37 +84,39 @@ COUNTRY_LENGTH = 30
 
 class StockTimeSeries(db.Model):
     symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
+    exchange = db.Column(db.String(EXCHANGE_LENGTH))
     dateValue = db.Column(db.PickleType())
     stockValues = db.Column(db.PickleType())
 
-    def __init__(self, symbol, date_value, time_series):
+    def __init__(self, symbol, exchange, date_value, time_series):
         self.symbol = symbol
+        self.exchange = exchange
         self.dateValue = date_value
         self.stockValues = time_series
 
 
 class StockTimeSeriesSchema(ma.Schema):
     class Meta:
-        fields = ("symbol", "dateValue", "stockValues")
+        fields = ("symbol", "exchange", "dateValue", "stockValues")
 
 
 class MarketState(db.Model):
     exchange = db.Column(db.String(EXCHANGE_LENGTH), primary_key=True)
     country = db.Column(db.String(COUNTRY_LENGTH))
-    is_market_open = db.Column(db.Boolean)
-    time_to_open = db.Column(db.PickleType())
-    time_to_close = db.Column(db.PickleType())
-    date_check = db.Column(db.DateTime)
+    isMarketOpen = db.Column(db.Boolean)
+    timeToOpen = db.Column(db.PickleType())
+    timeToClose = db.Column(db.PickleType())
+    dateCheck = db.Column(db.DateTime)
 
     def __init__(
-        self, exchange, country, is_market_open, time_to_open, time_to_close, date_check
+        self, exchange, country, isMarketOpen, timeToOpen, timeToClose, dateCheck
     ):
         self.exchange = exchange
         self.country = country
-        self.is_market_open = is_market_open
-        self.time_to_open = time_to_open
-        self.time_to_close = time_to_close
-        self.date_check = date_check
+        self.isMarketOpen = isMarketOpen
+        self.timeToOpen = timeToOpen
+        self.timeToClose = timeToClose
+        self.dateCheck = dateCheck
 
 
 class MarketStateSchema(ma.Schema):
@@ -129,21 +131,21 @@ class MarketStateSchema(ma.Schema):
         )
 
 
-class SymbolExchange(db.model):
-    symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
-    exchange = db.Column(db.String(EXCHANGE_LENGTH))
+# class SymbolExchange(db.Model):
+#     symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
+#     exchange = db.Column(db.String(EXCHANGE_LENGTH))
 
-    def __init__(self, symbol, exchange):
-        self.symbol = symbol
-        self.exchange = exchange
+#     def __init__(self, symbol, exchange):
+#         self.symbol = symbol
+#         self.exchange = exchange
 
 
-class SymbolExchangeSchema(ma.Schema):
-    class Meta:
-        fields = (
-            "symbol",
-            "exchange",
-        )
+# class SymbolExchangeSchema(ma.Schema):
+#     class Meta:
+#         fields = (
+#             "symbol",
+#             "exchange",
+#         )
 
 
 db.create_all()
@@ -156,7 +158,7 @@ logger.info("Database initialized.")
 
 
 @app.route("/check_symbol_data/<symbol>", methods=["GET"])
-def check_data_symbol(symbol: str) -> Dict[str, str]:
+def check_symbol_data(symbol: str) -> Dict[str, str]:
     """Check if data exists and is up-to-date in databse.
 
     This function verifies if the data corresponding to the
@@ -173,7 +175,7 @@ def check_data_symbol(symbol: str) -> Dict[str, str]:
     Dict[str, str]
         The dict with response information
     """
-    logger.info(f"Starting function check_data_symbol({symbol})...")
+    logger.info(f"Starting function check_symbol_data({symbol})...")
     data_symbol = db.session.get(StockTimeSeries, symbol)
     # data_symbol = StockTimeSeries.query.get(symbol)
     if data_symbol is None:
@@ -183,12 +185,18 @@ def check_data_symbol(symbol: str) -> Dict[str, str]:
         response = {"dataExists": True}
         logger.info(f"Data found for symbol {symbol}.")
         time_delta = datetime.datetime.today() - data_symbol.dateValue[-1]
-
         data_is_fresh = time_delta <= datetime.timedelta(days=1)
         response["dataIsFresh"] = data_is_fresh
         logger.info(f"Data is fresh : {data_is_fresh}.")
 
-    logger.info(f"Function check_data_symbol({symbol}) completed !")
+        if not data_is_fresh:
+            exchange = data_symbol.exchange
+            exchange_data = db.session.get(MarketState, exchange)
+            market_open = exchange_data.isMarketOpen
+            response["isMarketOpen"] = market_open
+            logger.info(f"Exchange {exchange} is open : {market_open}.")
+
+    logger.info(f"Function check_symbol_data({symbol}) completed !")
     return response
 
 
@@ -214,19 +222,20 @@ def check_market_state() -> Dict[str, str]:
     if twelve_data_status == "ko":
         logger.warning(f"Fetching data from Twelve data API failed.")
         status = "ko"
-        result = None
+        result_data = None
 
     else:
         logger.info(f"Fetching data from Twelve data API succeded !")
+
         for data_exchange in data_market.iloc:
             exchange = data_exchange["exchange"]
 
             logger.info(f"Processing data for exchange {exchange}...")
             country = data_exchange["country"]
-            is_market_open = data_exchange["is_market_open"]
-            time_to_open = data_exchange["time_to_open"]
-            time_to_close = data_exchange["time_to_close"]
-            date_check = data_exchange["date_check"]
+            isMarketOpen = data_exchange["isMarketOpen"]
+            timeToOpen = data_exchange["timeToOpen"]
+            timeToClose = data_exchange["timeToClose"]
+            dateCheck = data_exchange["dateCheck"]
 
             logger.info(f"Checking if exchange {exchange} exists in database...")
             old_exchange_data = db.session.get(MarketState, exchange)
@@ -236,10 +245,10 @@ def check_market_state() -> Dict[str, str]:
                 new_exchange_data = MarketState(
                     exchange,
                     country,
-                    is_market_open,
-                    time_to_open,
-                    time_to_close,
-                    date_check,
+                    isMarketOpen,
+                    timeToOpen,
+                    timeToClose,
+                    dateCheck,
                 )
                 db.session.add(new_exchange_data)
                 db.session.commit()
@@ -249,24 +258,16 @@ def check_market_state() -> Dict[str, str]:
                 logger.info(f"Data for exchange {exchange} found in database.")
                 logger.info(f"Updating data for {exchange} in database...")
                 old_exchange_data.country = country
-                old_exchange_data.isMarketOpen = is_market_open
-                old_exchange_data.timeToOpen = time_to_open
-                old_exchange_data.timeToClose = time_to_close
-                old_exchange_data.dateCheck = date_check
+                old_exchange_data.isMarketOpen = isMarketOpen
+                old_exchange_data.timeToOpen = timeToOpen
+                old_exchange_data.timeToClose = timeToClose
+                old_exchange_data.dateCheck = dateCheck
 
                 db.session.commit()
                 logger.info(f"Data for exchange {exchange} updated in database !")
 
-    data_market.rename(
-        {
-            "time_to_open": "timeToOpen",
-            "time_to_close": "timeToClose",
-            "is_market_open": "isMarketOpen",
-        },
-        axis=1,
-        inplace=True,
-    )
-    result_data = [json.loads(x.to_json()) for x in data_market.iloc]
+        result_data = [json.loads(x.to_json()) for x in data_market.iloc]
+
     return json.dumps({"status": status, "data": result_data})
 
 
@@ -326,7 +327,9 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
         logger.info(
             f"Fetching data for symbol {symbol} with method {method} from Twelve data API..."
         )
-        twelve_data_status, time_series = request_stock_time_series(symbol, API_KEY)
+        twelve_data_status, exchange, time_series = request_stock_time_series(
+            symbol, API_KEY
+        )
 
         if twelve_data_status == "error":
             logger.warning(
@@ -349,7 +352,9 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
             # POST method
             if method == "POST":
                 logger.info(f"Adding data for symbol {symbol} in database... ")
-                new_timeseries = StockTimeSeries(symbol, stocks_date, stock_values)
+                new_timeseries = StockTimeSeries(
+                    symbol, exchange, stocks_date, stock_values
+                )
                 db.session.add(new_timeseries)
 
                 db.session.commit()
@@ -373,6 +378,7 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
 
                 else:
                     logger.info(f"Data for symbol {symbol} in database retrieved !")
+                    old_timeseries.exchange = exchange
                     old_timeseries.dateValue = stocks_date
                     old_timeseries.stockValues = stock_values
 
