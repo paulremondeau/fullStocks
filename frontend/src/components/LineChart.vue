@@ -45,10 +45,6 @@ const data = reactive({
   }
 })
 
-function logMe() {
-  console.log(props.dataLineChart)
-  console.log(props.dataLineChart[Object.keys(props.dataLineChart)[0]].data[0][0])
-}
 </script>
 
 <template>

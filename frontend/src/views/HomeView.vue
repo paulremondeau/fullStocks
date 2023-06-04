@@ -89,7 +89,6 @@ function getOneTimeSeries(symbol) {
   axios
     .get(apiUrl + 'check_symbol_data/' + symbol)
     .then((res) => {
-      console.log(res)
       if (res.data.dataExists) { 
         if (res.data.dataIsFresh){
           axios.get(apiUrl + 'get_symbol_data/' + symbol)
