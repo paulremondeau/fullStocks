@@ -1,8 +1,10 @@
 <template>
   <div class="home">
     <MarketState :marketData="marketData" v-if="marketData.length != 0" @updateMarket="getMarketState()"/>
-    <LineChart :dataLineChart="dataLineChart" v-if="dataLineChart.length != 0" />
-    <StatsTable :tableData="dataStatsTable" v-if="dataStatsTable.length != 0"/>
+    <div class="symboldata">
+      <LineChart :dataLineChart="dataLineChart" v-if="dataLineChart.length != 0" />
+      <StatsTable :tableData="dataStatsTable" v-if="dataStatsTable.length != 0"/>
+    </div>
   </div>
 </template>
 
@@ -132,14 +134,18 @@ function processApiResult(res) {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 
 .home {
     display: inline;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
 
+    .symboldata {
+      display: flex;
+      margin-top: 20px;
+      justify-content: space-between;
+      align-items: center;
+      text-align: center;
+    }
 }
 
 </style>

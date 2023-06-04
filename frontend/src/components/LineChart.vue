@@ -56,7 +56,7 @@ function logMe() {
   <VueApexCharts
     type="line"
     height="700"
-    width="100%"
+    width="1200"
     :options="data.chartOptions"
     :series="data.series"
   ></VueApexCharts>
