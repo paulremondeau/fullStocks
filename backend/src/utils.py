@@ -4,6 +4,7 @@ from copy import copy
 from typing import List, Tuple, Dict
 
 import pandas as pd
+import datetime
 from dateutil.relativedelta import relativedelta
 
 
@@ -15,7 +16,8 @@ PARAMS_TIMESERIES = {
 }
 
 URL_SYMBOLS = "https://api.twelvedata.com/stocks"
-PARAMS_SYMBOLS = {"format": "json"}
+
+URL_MARKET_STATE = "https://api.twelvedata.com/market_state"
 
 
 def request_stock_time_series(
@@ -34,8 +36,9 @@ def request_stock_time_series(
 
     Returns
     -------
-    Tuple[str, Dict, Dict[str, Dict[str, float]]]
+    Tuple[str, str, Dict, Dict[str, Dict[str, float]]]
         The str is the twelve data API call status.
+        The second str is the exchange.
         The first dictionnary is the time series data.
         The second dictionnary contains the statistics data.
     """
@@ -54,6 +57,7 @@ def request_stock_time_series(
 
     elif status == "ok":
         # Convert to dataframe for easier manipulation
+        exchange = response.json()["meta"]["exchange"]
         df = pd.DataFrame(response.json()["values"])
         df = df.astype(
             {
@@ -69,31 +73,29 @@ def request_stock_time_series(
 
         working_df: pd.Series = df["close"]
 
-        return status, working_df
+        return status, exchange, working_df
 
 
-def request_avalaible_symbols(
-    api_key: str, exchange: List[str] = ["NASDAQ"]
-) -> List[str]:
-    """Fetch the available symbols list.
+def get_stocks_list(api_key: str, exchanges: List[str]) -> List[str]:
+    """Fetch the available stocks list.
 
     This function fetch the twelvedata API to get
-    the symbols of the instruments exchanged on
-    specifics exchange place.
+    the symbols of the stocks available on the API.
+    Note : the available stocks depends on your Twelve
+    Data bill plan.
 
     Parameters
     ----------
-    exchange : List[str], optional
-        List of the exchanges place to fetch, by default ["NASDAQ"]
+    exchanges : List[str]
+        List of the exchanges needed.
 
     Returns
     -------
     List[str]
         The symbols list
     """
-    params = copy(PARAMS_SYMBOLS)
-    if exchange:
-        params["exchange"] = exchange
+    params = {"apikey": api_key}
+    params["exchange"] = exchanges
     params["apikey"] = api_key
     response = requests.get(URL_SYMBOLS, params=params)
 
@@ -197,3 +199,52 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
     }
 
     return json_stats
+
+
+def get_markets_state(api_key: str) -> Tuple[str, pd.DataFrame]:
+    """Retrieves market state from Twelve Data API.
+
+    If request fails (not enough token), status is "ko"
+    and df is None.
+    If request succeds, status is "ok" and df contains the dataframe
+    with columns name, country, is_market_open, time_to_open, time_to_close, time_after_open, date_check.
+
+    Parameters
+    ----------
+    api_key : str
+        API key for the Tweleve Data API.
+
+    Returns
+    -------
+    Tuple[str, pd.DataFrame]
+        status and data.
+    """
+    params = {"apikey": api_key}
+    response = requests.get(URL_MARKET_STATE, params=params)
+
+    data = response.json()
+    if isinstance(data, dict):
+        # Request failed
+        status = "ko"
+        df = None
+
+    else:
+        status = "ok"
+        df = pd.DataFrame(data).drop(columns=["code"]).drop_duplicates()
+        df[["time_to_open", "time_to_close", "time_after_open"]] = df[
+            ["time_to_open", "time_to_close", "time_after_open"]
+        ].apply(pd.to_timedelta)
+        df["date_check"] = datetime.datetime.now()
+        df.rename(
+            {
+                "name": "exchange",
+                "time_to_open": "timeToOpen",
+                "time_to_close": "timeToClose",
+                "is_market_open": "isMarketOpen",
+                "date_check": "dateCheck",
+            },
+            axis=1,
+            inplace=True,
+        )
+
+    return status, df

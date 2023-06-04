@@ -2,15 +2,18 @@
 import { reactive } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 
+///// Props /////
 const props = defineProps({
   dataLineChart: Object
 })
 
+///// States /////
 const data = reactive({
   series: props.dataLineChart,
   chartOptions: {
     chart: {
       height: 350,
+      width: 500,
       type: 'line',
       zoom: {
         type: 'x',
@@ -52,8 +55,8 @@ function logMe() {
   <!-- <button @click="logMe()">logMe</button> -->
   <VueApexCharts
     type="line"
-    height="500"
-    width="1000"
+    height="700"
+    width="1200"
     :options="data.chartOptions"
     :series="data.series"
   ></VueApexCharts>
