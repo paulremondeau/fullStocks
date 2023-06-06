@@ -1,7 +1,7 @@
 <template>
     <div class="slider" >
-        <div class="slide-track" v-for="index in 3" :key="index">
-            <div class="slide" v-for="exchangeData in marketData">
+        <div class="slide-track" v-for="index in 2" :key="index">
+            <div class="slide" v-for="exchangeData in props.marketData">
                 <h1> {{exchangeData.exchange}} </h1>
                 <span :class="openOrClose(exchangeData)"> 
                     {{exchangeData.isMarketOpen ? "OPEN" : "CLOSE"}} 
@@ -16,20 +16,27 @@
 </template>
 
 <script setup>
-import {reactive, ref, watch, computed} from 'vue'
+import {ref, watch, computed} from 'vue'
 import {Duration} from "luxon";
-import {storeToRefs} from 'pinia'
 
-///// Stores /////
-import {useTimerMarketStore} from '@/stores/timermarket'
-const timerMarket = useTimerMarketStore() 
-const {timerValue} = storeToRefs(timerMarket)
+///// Timer /////
+const currentTime = ref(0);
+const updateCurrentTime = () => {
+    if (!props.updateMarket[0]) {
 
-///// States /////
-const emitUpdateMarket = ref(false)
+        if (currentTime.value > 1000) { // To avoid big big value and slow down
+            currentTime.value = 0
+            
+        } else {
+
+            currentTime.value++ ;
+        } 
+    }
+}; 
+const updateTimeInterval = setInterval(updateCurrentTime, 1000);
 
 // For the Caroussel
-const nomberOfExhanges = computed(() => 
+const numberOfExhanges = computed(() => 
     props.marketData.length
 )
 
@@ -49,60 +56,63 @@ function openOrClose (exchangeData) {
  */
 function updateTimerMarket(){
     return new Promise((resolve, reject) => {
-        if (!emitUpdateMarket.value) {
-             for (const exchangeData of props.marketData){
-            let indexData = props.marketData.indexOf(exchangeData)
-            if (exchangeData.isMarketOpen) {     
-                exchangeData.timeToClose -= 1000;
-                if (exchangeData.timeToClose < 0){
-                    timerMarket.disable()
-                    emitUpdateMarket.value = true
-                    
+        // If updateMarket is false
+        if (!props.updateMarket[0]) {
+            for (const exchangeData of props.marketData){
+                let indexData = props.marketData.indexOf(exchangeData)
+                if (exchangeData.isMarketOpen) {     
+                    exchangeData.timeToClose -= 1000;
+                    if (exchangeData.timeToClose <= 0){
+                        
+                        // This will trigger the emit and stop the updating
+                        props.updateMarket[0] = true
+                        
+                    } else {
+                    props.marketData[indexData] = exchangeData
+                    }
                 } else {
-                props.marketData[indexData] = exchangeData
-                }
-            } else {
-                exchangeData.timeToOpen -= 1000;
-                if (exchangeData.timeToOpen < 0){
-                    timerMarket.disable()
-                    emitUpdateMarket.value = true
-                    
-                } else {
-                props.marketData[indexData] = exchangeData
+                    exchangeData.timeToOpen -= 1000;
+                    if (exchangeData.timeToOpen <= 0){
+                        
+                        // This will trigger the emit and stop the updating
+                        props.updateMarket[0] = true
+                        
+                    } else {
+                    props.marketData[indexData] = exchangeData
+                    }
                 }
             }
-        }
-    } else {
-        emitUpdateMarket.value = false
-    }
+    } 
     // It's to make sure we will only trigger one emit
     resolve()
     })
 }
-
 
 ///// Props /////
 const props = defineProps({
   /**
    * The markets data.
    */
-  marketData: Object
+  marketData: Object,
+  updateMarket: Object,
+
 })
 
 ///// Emits /////
 const emit = defineEmits(["updateMarket"])
 
 // Timer decreasing event
-watch(timerValue, timerMarket.increment)
-watch(timerValue, () => {
+watch(currentTime, () => {
     updateTimerMarket()
         .then((res) => {
-            if (emitUpdateMarket.value) {
+            // If updateMarket is true
+            if (props.updateMarket[0]) {
                 emit('updateMarket')
             }
         })
     }
 )
+
 </script>
 
 
@@ -113,7 +123,7 @@ watch(timerValue, () => {
 }
 
 // Scroll adapts to number of child component to make it look continuous
-$nomberOfExhanges: v-bind('nomberOfExhanges');
+$numberOfExhanges: v-bind('numberOfExhanges');
 $animationSpeed: 40s;
 $sliderHeight: 80px;
 $slideWidth: 100px;
@@ -121,7 +131,7 @@ $slideWidth: 100px;
 // Animation
 @keyframes scroll {
 	0% { transform: translateX(0); }
-	100% { transform: translateX(calc(-1 * $slideWidth * $nomberOfExhanges))}
+	100% { transform: translateX(calc(-1 * $slideWidth * $numberOfExhanges))}
 }
 
 // Styling
@@ -156,7 +166,7 @@ $slideWidth: 100px;
 	.slide-track {
 		animation: scroll $animationSpeed linear infinite;
 		display: flex;
-		width: calc($slideWidth  * $nomberOfExhanges);
+		width: calc($slideWidth  * $numberOfExhanges);
 
         .slide {
 		height: $sliderHeight;

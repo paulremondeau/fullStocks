@@ -24,7 +24,7 @@ describe('LineChart', () => {
             {
                 props: 
                 {
-                    dataLineChart: { name: "foo", data: [[10,1], [121,10], [150,5]] }
+                    dataLineChart: [{ name: "foo", data: [[10,1], [121,10], [150,5]] }, {name: "abcd", data: [[10,1], [15,10], [150,5]]}]
                 }
         })
 

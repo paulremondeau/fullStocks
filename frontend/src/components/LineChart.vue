@@ -52,7 +52,7 @@ const data = reactive({
 watch(minimum, () => {
    data.chartOptions = {...data.chartOptions}
 })
-console.log(data.chartOptions)
+
 </script>
 
 <template>

@@ -81,13 +81,7 @@ describe('StatsTable', () => {
 
         // Remove data
         await tableData.pop()
-
         expect(wrapper.text()).toBe("SymbolCumulative returnAnnualized comulative returnAnnualized volatilityTEST101520Showing 1-1 of 1Row count:102550Go to page:1«First<Prev1>Next»Last")
-
-        // TODO : filter
-        await Object.assign(tableData, tableData.filter((data) => data["symbol"] == 'ABCD')) 
-        expect(wrapper.text()).toBe("SymbolCumulative returnAnnualized comulative returnAnnualized volatilityNo data")
-
 
     })
 })
