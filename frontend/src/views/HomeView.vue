@@ -1,9 +1,9 @@
 <template>
   <div class="home">
-    <MarketState :marketData="marketData" v-if="marketData.length != 0" @updateMarket="getMarketState()"/>
+    <MarketState :marketData="marketData" @updateMarket="getMarketState()"/>
     <div class="symboldata">
-      <LineChart :dataLineChart="dataLineChart" v-if="dataLineChart.length != 0" />
-      <StatsTable :tableData="dataStatsTable" v-if="dataStatsTable.length != 0"/>
+      <LineChart :dataLineChart="dataLineChart" />
+      <StatsTable :tableData="dataStatsTable"/>
     </div>
   </div>
 </template>

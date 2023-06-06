@@ -23,4 +23,5 @@ RUN npm run build
 EXPOSE 5000
 
 # Executables
-CMD [ "npm", "run", "dev" ]
+
+CMD [ "npm", "run", "preview" ]
