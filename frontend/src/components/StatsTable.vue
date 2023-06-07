@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed} from 'vue'
+import { reactive, computed, watch} from 'vue'
 import VueTableLite from 'vue3-table-lite'
 
 const props = defineProps({
@@ -36,19 +36,21 @@ const table = reactive({
         },
       ],
 
-  rows: props.tableData, 
+  rows: props.tableData,
   totalRecordCount: computed(() => {
-        return table.rows.length;
+        return table.rows.length 
       }),
   sortable: {
     order: "id",
     sort: "asc",
   },
 })
+
 </script>
 
 
 <template>
+<!-- <button @click="logMe"> Log Me </button> -->
   <VueTableLite
     :is-static-mode="true"
     :columns="table.columns"

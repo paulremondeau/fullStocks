@@ -1,16 +1,14 @@
 <template>
   <div class="home">
-    <MarketState :marketData="marketData" v-if="marketData.length != 0" @updateMarket="getMarketState()"/>
+    <MarketState :marketData="marketData" :updateMarket="updateMarket" @updateMarket="getMarketState()"/>
     <div class="symboldata">
-      <LineChart :dataLineChart="dataLineChart" v-if="dataLineChart.length != 0" />
-      <StatsTable :tableData="dataStatsTable" v-if="dataStatsTable.length != 0"/>
+      <LineChart :dataLineChart="dataLineChart" />
+      <StatsTable :tableData="dataStatsTable"/>
     </div>
   </div>
 </template>
 
 <script setup>
-// TODO :
-// - mettre l'autocomplete
 import { reactive, ref, onMounted, createApp } from 'vue'
 import axios from 'axios'
 import {storeToRefs} from 'pinia'
@@ -19,19 +17,14 @@ import LineChart from '../components/LineChart.vue'
 import StatsTable from '../components/StatsTable.vue'
 import MarketState from '../components/MarketState.vue'
 
-import {useTimerMarketStore} from '@/stores/timermarket'
 
 import apiUrl from '../../config.js'
-
-///// Stores /////
-const timerMarket = useTimerMarketStore()
-const {isEnabled} = storeToRefs(timerMarket)
-
 
 ///// States /////
 const dataStatsTable = reactive([])
 const dataLineChart = reactive([])
 const marketData = reactive([])
+const updateMarket = reactive([false]) // A petty trick to update in props...
 const selectedSymbols = reactive(['AAPL', 'MSFT', 'META'])
 
 onMounted(() => {
@@ -50,15 +43,16 @@ function getMarketState() {
   axios
     .get(apiUrl + "check_market_state")
     .then((res) => {
-      timerMarket.disable()
+      // This prevents unnecessary updating
+      updateMarket[0] = true
       if (res.data.status == 'ok') {
         Object.assign(marketData, res.data.data)  
       }
     }).catch((error) => {
       console.error(error)
     }).finally(() => {
-      timerMarket.enable()
-      timerMarket.reset()
+      // Data can update again
+      updateMarket[0] = false
     })
 }
 

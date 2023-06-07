@@ -1,5 +1,5 @@
 <script setup>
-import { reactive } from 'vue'
+import { reactive, computed, watch } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 
 ///// Props /////
@@ -8,12 +8,15 @@ const props = defineProps({
 })
 
 ///// States /////
+// Needed to make the chart reactive to option change
+const minimum = computed(() => {
+        return props.dataLineChart.length == 0 ? 0 : props.dataLineChart[Object.keys(props.dataLineChart)[0]].data[0][0]
+})
+
 const data = reactive({
   series: props.dataLineChart,
   chartOptions: {
     chart: {
-      height: 350,
-      width: 500,
       type: 'line',
       zoom: {
         type: 'x',
@@ -39,16 +42,20 @@ const data = reactive({
     },
     xaxis: {
       type: 'datetime',
-      min: props.dataLineChart[Object.keys(props.dataLineChart)[0]].data[0][0],
+      min : minimum,
       tickAmount: 6
     }
   }
 })
 
+// Make the chart rerender when data minimum changes
+watch(minimum, () => {
+   data.chartOptions = {...data.chartOptions}
+})
+
 </script>
 
 <template>
-  <!-- <button @click="logMe()">logMe</button> -->
   <VueApexCharts
     type="line"
     height="700"

@@ -34,7 +34,7 @@ from src.utils import (
     evaluate_stats_information,
     get_markets_state,
 )
-from config import API_KEY, FRONTEND_URL, API_PLAN
+from config import API_KEY, API_PLAN, FRONTEND_URL
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -403,6 +403,8 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
 
 # Start the app
 if __name__ == "__main__":
+    # Production server
+
     from waitress import serve
 
     serve(app, host="0.0.0.0", port=5000)
