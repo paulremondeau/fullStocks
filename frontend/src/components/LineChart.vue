@@ -1,6 +1,5 @@
 <script setup>
 import { reactive, computed, watch } from 'vue'
-import VueApexCharts from 'vue3-apexcharts'
 
 ///// Props /////
 const props = defineProps({
@@ -56,11 +55,11 @@ watch(minimum, () => {
 </script>
 
 <template>
-  <VueApexCharts
+  <apexchart
     type="line"
     height="700"
     width="1200"
     :options="data.chartOptions"
     :series="data.series"
-  ></VueApexCharts>
+  ></apexchart>
 </template>
