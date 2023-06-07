@@ -11,7 +11,6 @@
 <script setup>
 import { reactive, ref, onMounted, createApp } from 'vue'
 import axios from 'axios'
-import {storeToRefs} from 'pinia'
 
 import LineChart from '../components/LineChart.vue'
 import StatsTable from '../components/StatsTable.vue'
