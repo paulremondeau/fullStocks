@@ -1,3 +1,6 @@
+pytest
+requests-mock 
+typeguard
 requests
 flask
 flask_cors

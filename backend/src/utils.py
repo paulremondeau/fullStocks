@@ -3,9 +3,14 @@ import json
 from copy import copy
 from typing import List, Tuple, Dict
 
+import numpy as np
 import pandas as pd
 import datetime
 from dateutil.relativedelta import relativedelta
+
+from typeguard import check_type
+
+from .exceptions import TwelveDataApiException, handle_exception
 
 
 URL_TIMESERIES = "https://api.twelvedata.com/time_series"
@@ -20,9 +25,10 @@ URL_SYMBOLS = "https://api.twelvedata.com/stocks"
 URL_MARKET_STATE = "https://api.twelvedata.com/market_state"
 
 
+@handle_exception
 def request_stock_time_series(
     symbol: str, api_key: str
-) -> Tuple[str, Dict[str, float], Dict[str, Dict[str, float]]]:
+) -> Dict[str, str | int | pd.DataFrame]:
     """Request the twelve data API for stock informations.
 
     This function requests meta and time series for the requested
@@ -36,11 +42,10 @@ def request_stock_time_series(
 
     Returns
     -------
-    Tuple[str, str, Dict, Dict[str, Dict[str, float]]]
-        The str is the twelve data API call status.
-        The second str is the exchange.
-        The first dictionnary is the time series data.
-        The second dictionnary contains the statistics data.
+    Dict[str, str | int | pd.DataFrame]
+        res["status"] is ok or error
+            - if status is error, dict contains code of error and message
+            - if status is ok, dict contains exchange and data in dataframe
     """
 
     # API request
@@ -49,65 +54,118 @@ def request_stock_time_series(
     params["apikey"] = api_key
     response = requests.get(URL_TIMESERIES, params=params)
 
-    status = response.json()["status"]
+    status_code_requests = response.status_code
+    if status_code_requests == 404:
+        # URL is not found
+        raise TwelveDataApiException(404, "Not found")
 
-    if status == "error":
-        # The request failed
-        return status, None
+    elif status_code_requests == 200:
+        # Request succedeed
+        response_json = response.json()
+        status = response_json["status"]
 
-    elif status == "ok":
-        # Convert to dataframe for easier manipulation
-        exchange = response.json()["meta"]["exchange"]
-        df = pd.DataFrame(response.json()["values"])
-        df = df.astype(
-            {
-                "open": "float64",
-                "high": "float64",
-                "high": "float64",
-                "close": "float64",
-                "volume": "int64",
-            }
-        )
-        df["datetime"] = pd.to_datetime(df["datetime"])
-        df = df.set_index("datetime").sort_index()
+        if status == "error":
+            # An error occured with Twelve Data API
+            code = response_json["code"]
+            message = response_json["message"]
 
-        working_df: pd.Series = df["close"]
+            raise TwelveDataApiException(code, message)
 
-        return status, exchange, working_df
+        else:
+            # Convert to dataframe for easier manipulation
+            meta: Dict[str, str] = check_type(response_json["meta"], Dict[str, str])
+
+            values: List[Dict[str, str]] = check_type(
+                response_json["values"], List[Dict[str, str]]
+            )
+
+            # Assert meta data is good format
+            assert set(meta.keys()) == {
+                "symbol",
+                "interval",
+                "currency",
+                "exchange_timezone",
+                "exchange",
+                "mic_code",
+                "type",
+            }, "Meta data are not correct, check Twelve Data API"
+
+            exchange = meta["exchange"]
+
+            values = response_json["values"]
+            # Check if values is not an empty list
+            assert values, "Data value is empty, check Twelve Data API"
+
+            values_keys = [x.keys() for x in response_json["values"]]
+
+            # Assert that data is of type List[Dict] with all dict having same keys
+            assert all(
+                x == values_keys[0] for x in values_keys
+            ), "Data value keys are not always the same, check Twelve Data API"
+
+            assert set(values_keys[0]) == {
+                "datetime",
+                "open",
+                "high",
+                "low",
+                "volume",
+                "close",
+            }, "Data value keys are not the expected ones, check Twelve Data API"
+
+            df = pd.DataFrame(response_json["values"])
+            df = df.astype(
+                {
+                    "open": "float64",
+                    "high": "float64",
+                    "high": "float64",
+                    "close": "float64",
+                    "volume": "int64",
+                }
+            )
+            df["datetime"] = pd.to_datetime(df["datetime"])
+            df = df.set_index("datetime").sort_index()
+
+            working_df: pd.Series = df["close"]
+
+            return {"status": status, "exchange": exchange, "data": working_df}
+
+    else:
+        # Statut code non géré
+        raise TwelveDataApiException(501, "Not implemented")
 
 
-def get_stocks_list(api_key: str, exchanges: List[str]) -> List[str]:
-    """Fetch the available stocks list.
+# def get_stocks_list(api_key: str, exchanges: List[str]) -> List[str]:
+#     """Fetch the available stocks list.
 
-    This function fetch the twelvedata API to get
-    the symbols of the stocks available on the API.
-    Note : the available stocks depends on your Twelve
-    Data bill plan.
+#     This function fetch the twelvedata API to get
+#     the symbols of the stocks available on the API.
+#     Note : the available stocks depends on your Twelve
+#     Data bill plan.
 
-    Parameters
-    ----------
-    exchanges : List[str]
-        List of the exchanges needed.
+#     Parameters
+#     ----------
+#     exchanges : List[str]
+#         List of the exchanges needed.
 
-    Returns
-    -------
-    List[str]
-        The symbols list
-    """
-    params = {"apikey": api_key}
-    params["exchange"] = exchanges
-    params["apikey"] = api_key
-    response = requests.get(URL_SYMBOLS, params=params)
+#     Returns
+#     -------
+#     List[str]
+#         The symbols list
+#     """
+#     params = {"apikey": api_key}
+#     params["exchange"] = exchanges
+#     params["apikey"] = api_key
+#     response = requests.get(URL_SYMBOLS, params=params)
 
-    symbols_list: List[str] = [x["symbol"] for x in response.json()["data"]]
-    return symbols_list
+#     symbols_list: List[str] = [x["symbol"] for x in response.json()["data"]]
+#     return symbols_list
 
 
 def format_sending_data(
     stock_dates: List[pd.Timestamp] | None,
     stock_time_series: List[float] | None,
     performance: bool = True,
-) -> List[list]:
+) -> List[List[int | float]]:
     """Format data to send to the frontend.
 
     This function pre-process the data before sending to
@@ -126,11 +184,12 @@ def format_sending_data(
 
     Returns
     -------
-    List[list] | None
+    List[List[int | float]]
         The data formatted.
     """
+
     if stock_dates is None or stock_time_series is None:
-        return None
+        result = []
 
     else:
         stocks_date_timestamps = [
@@ -138,16 +197,94 @@ def format_sending_data(
         ]
 
         if performance:
-            stock_time_series = list(
-                pd.Series(stock_time_series) / stock_time_series[0] * 100
-            )
+            # Format for performance
+            try:
+                stock_time_series = list(
+                    pd.Series(stock_time_series) / stock_time_series[0] * 100
+                )
+            except IndexError:
+                stock_time_series = []
 
         result = [
             [timestamp, float(f"{ts_value:.2f}")]
             for timestamp, ts_value in zip(stocks_date_timestamps, stock_time_series)
         ]
 
-        return result
+    return result
+
+
+def evaluate_cumulative_return(data: pd.Series) -> float:
+    """Evaluate the cumulative return of a series in percent.
+
+    Lets write P_initial the initial value of our series,
+    and P_current the current value of our series.
+
+    The cumulative return is then (P_current - P_initial) / P_initial
+
+
+    Parameters
+    ----------
+    data : pd.Series
+        The data series of stock price.
+
+    Returns
+    -------
+    float
+        The cumulative return
+    """
+
+    if not data.index.is_monotonic_increasing:
+        data = data.sort_index()
+
+    cumulative_return: float = (data[-1] - data[-2]) / data[-2] * 100
+    cumulative_return = float(f"{cumulative_return:.2f}")
+
+    return cumulative_return
+
+
+def evaluate_annualized_return(data: pd.Series, n_years: int) -> float:
+    """Evaluate the annualized return.
+
+    The annualized return for n_years is
+    ((1+ Rc) ^ (1/n_years)) - 1
+
+    Parameters
+    ----------
+    data : pd.Series
+        The data series of stock price.
+    n_years: int
+        The number of years we want to calculate the return for.
+
+    Returns
+    -------
+    float
+        The annualized cumulative return
+    """
+    if not data.index.is_monotonic_increasing:
+        data = data.sort_index()
+
+    most_recent_date = data.index[-1]
+    data_n_years_ago = data[
+        data.index <= (most_recent_date - relativedelta(years=n_years))
+    ]
+
+    if data_n_years_ago.empty:
+        # Stock price is not long enough to evaluate the annualized return for this n_years
+        annualized_cumulative_return = np.nan
+
+    else:
+        stock_price_n_years_ago = data_n_years_ago[-1]
+
+        cumulative_return: float = (
+            data[-1] - stock_price_n_years_ago
+        ) / stock_price_n_years_ago
+
+        annualized_cumulative_return = (
+            ((1 + cumulative_return) ** (1 / n_years)) - 1
+        ) * 100
+        annualized_cumulative_return = float(f"{annualized_cumulative_return:.2f}")
+
+    return annualized_cumulative_return
 
 
 def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float | str]:
@@ -172,18 +309,10 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
     Dict[str, float | str]
         The result dict.
     """
-    # Cumulative return as (f(t) - f(t-1))/f(t-1) *100
-    cumulative_return: float = (data.iloc[-1] - data.iloc[-2]) / data.iloc[-2] * 100
-    cumulative_return = float(f"{cumulative_return:.2f}")
 
-    # Annualized cumulative return
-    stock_price_one_year_ago: float = data[
-        data.index >= (data.index[-1] - relativedelta(years=1))
-    ].iloc[0]
-    annualized_cumulative_return: float = (
-        (data.iloc[-1] - stock_price_one_year_ago) / stock_price_one_year_ago * 100
-    )
-    annualized_cumulative_return = float(f"{annualized_cumulative_return:.2f}")
+    cumulative_return: float = evaluate_cumulative_return(data)
+
+    annualized_cumulative_return = evaluate_annualized_return(data, n_years=1)
 
     # Annualized volatility
     annualized_volatility: float = (
@@ -199,6 +328,10 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
     }
 
     return json_stats
+
+
+def evaluate_annualized_volatility(data: pd.Series, n_years: int) -> float:
+    pass
 
 
 def get_markets_state(api_key: str) -> Tuple[str, pd.DataFrame]:

@@ -328,13 +328,14 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
         logger.info(
             f"Fetching data for symbol {symbol} with method {method} from Twelve data API..."
         )
-        twelve_data_status, exchange, time_series = request_stock_time_series(
-            symbol, API_KEY
-        )
+        result_from_twelve_data = request_stock_time_series(symbol, API_KEY)
+        twelve_data_status = result_from_twelve_data["status"]
 
         if twelve_data_status == "error":
-            logger.warning(
-                f"Fetching data for symbol {symbol} with method {method} from Twelve data API failed."
+            code = result_from_twelve_data["code"]
+            message = result_from_twelve_data["message"]
+            logger.error(
+                f"Error from Twelve Data API :\nCode : {code}\nMessage : {message}"
             )
             logger.warning(f"Request is KO. Returning None.")
             status = "ko"
@@ -343,6 +344,8 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
             json_stats = None
 
         else:
+            exchange = result_from_twelve_data["exchange"]
+            time_series = result_from_twelve_data["data"]
             logger.info(
                 f"Fetching data for symbol {symbol} with method {method} from Twelve data API succeded !"
             )
@@ -387,7 +390,9 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
                     logger.info(f"Data for symbol {symbol} in database updated !")
 
     logger.info(f"Formating data for the frontend...")
-    response_formatted_data = format_sending_data(stocks_date, stock_values)
+    response_formatted_data: List[List[int | float]] = format_sending_data(
+        stocks_date, stock_values
+    )
     logger.info(f"Data succesfuly formated for the frontend !")
 
     logger.info(f"Function request_data({symbol}) completed !")
