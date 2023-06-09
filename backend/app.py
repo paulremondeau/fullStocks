@@ -218,7 +218,8 @@ def check_market_state() -> Dict[str, str]:
     status = "ok"
 
     logger.info(f"Fetching data from Twelve data API...")
-    twelve_data_status, data_market = get_markets_state(API_KEY)
+    result_from_twelve_data = get_markets_state(API_KEY)
+    twelve_data_status = result_from_twelve_data["status"]
     if twelve_data_status == "ko":
         logger.warning(f"Fetching data from Twelve data API failed.")
         status = "ko"
@@ -226,7 +227,7 @@ def check_market_state() -> Dict[str, str]:
 
     else:
         logger.info(f"Fetching data from Twelve data API succeded !")
-
+        data_market = result_from_twelve_data["data"]
         for data_exchange in data_market.iloc:
             exchange = data_exchange["exchange"]
 

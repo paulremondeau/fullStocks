@@ -22,6 +22,7 @@ import pytest
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 
 import requests_mock
@@ -318,6 +319,18 @@ def test_format_sending_data():
 
 
 def test_evaluate_cumulative_return():
+    # Should return nan is not enough data
+    data = pd.Series(
+        [1],
+        index=pd.Index(
+            [
+                pd.Timestamp(1, unit="d"),
+            ]
+        ),
+    )
+    assert np.isnan(evaluate_cumulative_return(data))
+
+    # Should work if data is good
     data = pd.Series(
         [1, 5, 7, 2, 3],
         index=pd.Index(
@@ -335,8 +348,111 @@ def test_evaluate_cumulative_return():
 
 
 def test_evaluate_annualized_return():
-    pass
+    # Should return nan if data is not timely wide enough
+
+    data = pd.Series(
+        [1, 5, 7, 2, 3],
+        index=pd.Index(
+            [
+                pd.Timestamp(1, unit="d"),
+                pd.Timestamp(7, unit="d"),
+                pd.Timestamp(3, unit="d"),
+                pd.Timestamp(4, unit="d"),
+                pd.Timestamp(5, unit="d"),
+            ]
+        ),
+    )
+    assert np.isnan(evaluate_annualized_return(data, n_years=1))
+
+    data = pd.Series(
+        [1, 5, 7, 2, 3],
+        index=pd.Index(
+            [
+                pd.Timestamp(0, unit="d"),
+                pd.Timestamp(7, unit="d"),
+                pd.Timestamp(3, unit="d"),
+                pd.Timestamp(4, unit="d"),
+                pd.Timestamp(365, unit="d"),
+            ]
+        ),
+    )
+    assert np.isnan(evaluate_annualized_return(data, n_years=2))
+
+    # Should work if data is timely wide enough
+    assert evaluate_annualized_return(data, n_years=1) == 200.0
 
 
+# TODO : complete this
 def test_evaluate_annualized_volatility():
     pass
+
+
+def test_evaluate_stats_information():
+    symbol = "foo"
+    data = pd.Series(
+        [1, 5, 7, 2, 3],
+        index=pd.Index(
+            [
+                pd.Timestamp(0, unit="d"),
+                pd.Timestamp(7, unit="d"),
+                pd.Timestamp(3, unit="d"),
+                pd.Timestamp(4, unit="d"),
+                pd.Timestamp(365, unit="d"),
+            ]
+        ),
+    )
+
+    assert evaluate_stats_information(data, symbol) == {
+        "symbol": symbol,
+        "cumulativeReturn": -40.0,
+        "annualizedCumulativeReturn": 200.0,
+        "annualizedVolatility": 2.41,
+    }
+
+
+# TODO : complete this
+def test_get_markets_state(requests_mock):
+    # region Should handle exceptions
+
+    # region Should handle status error from Twelve Data API
+    api_response = {"status": "error", "code": 400, "message": "foo"}
+    requests_mock.get(URL_MARKET_STATE, json=api_response)
+
+    assert get_markets_state("foo") == {
+        "status": "error",
+        "code": 400,
+        "message": "foo",
+    }
+    # endregion
+
+    # region Should handle when data type are not correct
+
+    # region Should handle when meta data is not Dict[str, str]
+    data = [{"foo": 1}]
+
+    api_response = {"data": data, "status": "ok"}
+    requests_mock.get(URL_MARKET_STATE, json=api_response)
+    assert get_markets_state("foo") == {
+        "code": 500,
+        "message": "value of key 'foo' of item 0 of list is not an instance of str",
+        "status": "error",
+    }
+    # endregion
+
+    # region Should handle when data is empty
+
+    data = []
+
+    api_response = {"data": data, "status": "ok"}
+    requests_mock.get(URL_MARKET_STATE, json=api_response)
+    assert get_markets_state("foo") == {
+        "code": 500,
+        "message": "No data retrieved, check Twelve Data API.",
+        "status": "error",
+    }
+
+    # endregion
+
+    # endregion
+
+    # endregion

@@ -19,10 +19,70 @@ PARAMS_TIMESERIES = {
     "outputsize": "5000",
     "format": "json",
 }
+META_KEYS = {
+    "symbol",
+    "interval",
+    "currency",
+    "exchange_timezone",
+    "exchange",
+    "mic_code",
+    "type",
+}
+VALUES_KEYS = {
+    "datetime",
+    "open",
+    "high",
+    "low",
+    "volume",
+    "close",
+}
+
 
 URL_SYMBOLS = "https://api.twelvedata.com/stocks"
 
 URL_MARKET_STATE = "https://api.twelvedata.com/market_state"
+MARKET_STATE_KEYS = {
+    "name",
+    "code",
+    "country",
+    "is_market_open",
+    "time_to_open",
+    "time_to_close",
+    "time_after_open",
+}
+
+
+# TODO :  docstring this
+def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str | list]:
+    status_code_requests = response.status_code
+    if status_code_requests == 404:
+        # URL is not found
+        raise TwelveDataApiException(404, "Not found")
+
+    elif status_code_requests == 200:
+        # Request succedeed
+        response_json = response.json()
+        if isinstance(response_json, list):
+            # This is for the market data
+            status = "ok"
+            response_json = {"status": "ok", "data": response_json}
+
+        else:
+            status = response_json["status"]
+
+        if status == "error":
+            # An error occured with Twelve Data API
+            code = response_json["code"]
+            message = response_json["message"]
+
+            raise TwelveDataApiException(code, message)
+
+        else:
+            return response_json
+
+    else:
+        # Statut code non géré
+        raise TwelveDataApiException(501, "Not implemented")
 
 
 @handle_exception
@@ -54,84 +114,52 @@ def request_stock_time_series(
     params["apikey"] = api_key
     response = requests.get(URL_TIMESERIES, params=params)
 
-    status_code_requests = response.status_code
-    if status_code_requests == 404:
-        # URL is not found
-        raise TwelveDataApiException(404, "Not found")
+    response_json = check_twelvedata_api_response(response)
 
-    elif status_code_requests == 200:
-        # Request succedeed
-        response_json = response.json()
-        status = response_json["status"]
+    meta: Dict[str, str] = check_type(response_json["meta"], Dict[str, str])
 
-        if status == "error":
-            # An error occured with Twelve Data API
-            code = response_json["code"]
-            message = response_json["message"]
+    values: List[Dict[str, str]] = check_type(
+        response_json["values"], List[Dict[str, str]]
+    )
 
-            raise TwelveDataApiException(code, message)
+    # Assert meta data is good format
+    assert (
+        set(meta.keys()) == META_KEYS
+    ), "Meta data are not correct, check Twelve Data API"
 
-        else:
-            # Convert to dataframe for easier manipulation
-            meta: Dict[str, str] = check_type(response_json["meta"], Dict[str, str])
+    exchange = meta["exchange"]
 
-            values: List[Dict[str, str]] = check_type(
-                response_json["values"], List[Dict[str, str]]
-            )
+    values = response_json["values"]
+    # Check if values is not an empty list
+    assert values, "Data value is empty, check Twelve Data API"
 
-            # Assert meta data is good format
-            assert set(meta.keys()) == {
-                "symbol",
-                "interval",
-                "currency",
-                "exchange_timezone",
-                "exchange",
-                "mic_code",
-                "type",
-            }, "Meta data are not correct, check Twelve Data API"
+    values_keys = [x.keys() for x in response_json["values"]]
 
-            exchange = meta["exchange"]
+    # Assert that data is of type List[Dict] with all dict having same keys
+    assert all(
+        x == values_keys[0] for x in values_keys
+    ), "Data value keys are not always the same, check Twelve Data API"
 
-            values = response_json["values"]
-            # Check if values is not an empty list
-            assert values, "Data value is empty, check Twelve Data API"
+    assert (
+        set(values_keys[0]) == VALUES_KEYS
+    ), "Data value keys are not the expected ones, check Twelve Data API"
 
-            values_keys = [x.keys() for x in response_json["values"]]
+    df = pd.DataFrame(response_json["values"])
+    df = df.astype(
+        {
+            "open": "float64",
+            "high": "float64",
+            "high": "float64",
+            "close": "float64",
+            "volume": "int64",
+        }
+    )
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df = df.set_index("datetime").sort_index()
 
-            # Assert that data is of type List[Dict] with all dict having same keys
-            assert all(
-                x == values_keys[0] for x in values_keys
-            ), "Data value keys are not always the same, check Twelve Data API"
+    working_df: pd.Series = df["close"]
 
-            assert set(values_keys[0]) == {
-                "datetime",
-                "open",
-                "high",
-                "low",
-                "volume",
-                "close",
-            }, "Data value keys are not the expected ones, check Twelve Data API"
-
-            df = pd.DataFrame(response_json["values"])
-            df = df.astype(
-                {
-                    "open": "float64",
-                    "high": "float64",
-                    "high": "float64",
-                    "close": "float64",
-                    "volume": "int64",
-                }
-            )
-            df["datetime"] = pd.to_datetime(df["datetime"])
-            df = df.set_index("datetime").sort_index()
-
-            working_df: pd.Series = df["close"]
-
-            return {"status": status, "exchange": exchange, "data": working_df}
-
-    else:
-        # Statut code non géré
-        raise TwelveDataApiException(501, "Not implemented")
+    return {"status": "ok", "exchange": exchange, "data": working_df}
 
 
 # def get_stocks_list(api_key: str, exchanges: List[str]) -> List[str]:
@@ -230,14 +258,19 @@ def evaluate_cumulative_return(data: pd.Series) -> float:
     Returns
     -------
     float
-        The cumulative return
+        The cumulative return.
+        If data is not long enough, return np.nan.
     """
 
     if not data.index.is_monotonic_increasing:
         data = data.sort_index()
 
-    cumulative_return: float = (data[-1] - data[-2]) / data[-2] * 100
-    cumulative_return = float(f"{cumulative_return:.2f}")
+    if len(data) < 2:
+        cumulative_return = np.nan
+
+    else:
+        cumulative_return: float = (data[-1] - data[-2]) / data[-2] * 100
+        cumulative_return = float(f"{cumulative_return:.2f}")
 
     return cumulative_return
 
@@ -258,7 +291,8 @@ def evaluate_annualized_return(data: pd.Series, n_years: int) -> float:
     Returns
     -------
     float
-        The annualized cumulative return
+        The annualized cumulative return.
+        If data is not long enough, return np.nan.
     """
     if not data.index.is_monotonic_increasing:
         data = data.sort_index()
@@ -285,6 +319,31 @@ def evaluate_annualized_return(data: pd.Series, n_years: int) -> float:
         annualized_cumulative_return = float(f"{annualized_cumulative_return:.2f}")
 
     return annualized_cumulative_return
+
+
+# TODO: review this
+def evaluate_annualized_volatility(data: pd.Series, n_years: int = 1) -> float:
+    """Evaluate the annualized volatility.
+
+    Parameters
+    ----------
+    data : pd.Series
+        The data.
+    n_years: int
+        The number of years we want to calculate the volatility for.
+
+    Returns
+    -------
+    float
+        The annualized volatility.
+    """
+
+    annualized_volatility: float = (
+        data[data.index >= data.index[-1] - relativedelta(years=1)]
+    ).std()
+    annualized_volatility = float(f"{annualized_volatility:.2f}")
+
+    return annualized_volatility
 
 
 def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float | str]:
@@ -314,11 +373,7 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
 
     annualized_cumulative_return = evaluate_annualized_return(data, n_years=1)
 
-    # Annualized volatility
-    annualized_volatility: float = (
-        data[data.index >= data.index[-1] - relativedelta(years=1)]
-    ).std()
-    annualized_volatility = float(f"{annualized_volatility:.2f}")
+    annualized_volatility: float = evaluate_annualized_volatility(data)
 
     json_stats: Dict[str, Dict[str, float]] = {
         "symbol": symbol,
@@ -330,11 +385,8 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
     return json_stats
 
 
-def evaluate_annualized_volatility(data: pd.Series, n_years: int) -> float:
-    pass
-
-
-def get_markets_state(api_key: str) -> Tuple[str, pd.DataFrame]:
+@handle_exception
+def get_markets_state(api_key: str) -> Dict[str, str | int | pd.DataFrame]:
     """Retrieves market state from Twelve Data API.
 
     If request fails (not enough token), status is "ko"
@@ -349,35 +401,49 @@ def get_markets_state(api_key: str) -> Tuple[str, pd.DataFrame]:
 
     Returns
     -------
-    Tuple[str, pd.DataFrame]
-        status and data.
+    Dict[str, str | int | pd.DataFrame]
+        Dict[str, str | int | pd.DataFrame]
+        res["status"] is ok or error
+            - if status is error, dict contains code of error and message
+            - if status is ok, dict contains market state dataframe
     """
     params = {"apikey": api_key}
     response = requests.get(URL_MARKET_STATE, params=params)
 
-    data = response.json()
-    if isinstance(data, dict):
-        # Request failed
-        status = "ko"
-        df = None
+    response_json = check_twelvedata_api_response(response)
 
-    else:
-        status = "ok"
-        df = pd.DataFrame(data).drop(columns=["code"]).drop_duplicates()
-        df[["time_to_open", "time_to_close", "time_after_open"]] = df[
-            ["time_to_open", "time_to_close", "time_after_open"]
-        ].apply(pd.to_timedelta)
-        df["date_check"] = datetime.datetime.now()
-        df.rename(
-            {
-                "name": "exchange",
-                "time_to_open": "timeToOpen",
-                "time_to_close": "timeToClose",
-                "is_market_open": "isMarketOpen",
-                "date_check": "dateCheck",
-            },
-            axis=1,
-            inplace=True,
-        )
+    data: List[Dict[str, str]] = check_type(response_json["data"], List[Dict[str, str]])
 
-    return status, df
+    assert data, "No data retrieved, check Twelve Data API."
+
+    # TODO : finish this
+    # data_keys = [x.keys() for x in data]
+    # # Assert that data is of type List[Dict] with all dict having same keys
+    # assert all(
+    #     x == data_keys[0] for x in data_keys
+    # ), "Data value keys are not always the same, check Twelve Data API"
+
+    # assert (
+    #     set(data_keys[0]) == VALUES_KEYS
+    # ), "Data value keys are not the expected ones, check Twelve Data API"
+
+    df = pd.DataFrame(data).drop(columns=["code"]).drop_duplicates()
+    df[["time_to_open", "time_to_close", "time_after_open"]] = df[
+        ["time_to_open", "time_to_close", "time_after_open"]
+    ].apply(pd.to_timedelta)
+    df["date_check"] = datetime.datetime.now()
+    df.rename(
+        {
+            "name": "exchange",
+            "time_to_open": "timeToOpen",
+            "time_to_close": "timeToClose",
+            "is_market_open": "isMarketOpen",
+            "date_check": "dateCheck",
+        },
+        axis=1,
+        inplace=True,
+    )
+
+    response_json["data"] = df
+
+    return response_json
