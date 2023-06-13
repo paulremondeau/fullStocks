@@ -2,11 +2,11 @@ name: Deploy Sphinx Documentation
 
 on: 
   push:
-    branch: 
-      main
+    branches: 
+      - main
   pull_request:
-    branch:
-      main
+    branches:
+      - main
 
 
 permissions:
