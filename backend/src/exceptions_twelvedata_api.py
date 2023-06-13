@@ -20,6 +20,10 @@ __logger__ = "exceptions_twelvedata_api.py"
 
 from typeguard import TypeCheckError
 
+import logging
+
+logger = logging.getLogger(__logger__)
+
 # =================================================================================================
 #     Functions
 # =================================================================================================
@@ -49,12 +53,15 @@ def handle_exception(func):
             return func(*args, **kwargs)
 
         except TwelveDataApiException as e:
+            logger.error(e)
             return {"status": "error", "code": e.code, "message": e.message}
 
         except AssertionError as e:
+            logger.error(e)
             return {"status": "error", "code": 500, "message": e.args[0]}
 
         except TypeCheckError as e:
+            logger.error(e)
             return {"status": "error", "code": 500, "message": str(e)}
 
     return wrapper

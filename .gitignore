@@ -37,3 +37,14 @@ __pycache__
 .venv
 *.ipynb
 config.*
+
+## Sphinx
+backend/docs/sphinx
+# backend/docs/make.bat
+# backend/docs/Makefile
+# backend/docs/source
+# backend/docs/build/doctrees
+# _sources
+
+## Mkdocs
+mkdocs.yml
