@@ -18,6 +18,8 @@ __logger__ = "exceptions_twelvedata_api.py"
 #     Libs
 # =================================================================================================
 
+import functools
+
 from typeguard import TypeCheckError
 
 import logging
@@ -30,7 +32,17 @@ logger = logging.getLogger(__logger__)
 
 
 class TwelveDataApiException(Exception):
-    """Exception class for issues coming from Twelve Data API."""
+    """Exception class for issues coming from Twelve Data API.
+
+    Examples
+    ----------
+    >>> try:
+    >>>     raise TwelveDataApiException(500, "Erreur")
+    >>> except TwelveDataApiException as e:
+    >>>     print(e.code, e.message)
+    500 Erreur
+
+    """
 
     def __init__(self, code, message):
         self.code = code
@@ -44,10 +56,32 @@ def handle_exception(func):
 
     Parameters
     ----------
-    func : _type_
-        _description_
+    func : function
+        Function called within the wrapper.
+
+    Examples
+    ----------
+    Let's define a simple function that raise TwelveDataApiException if its argument is True :
+
+    >>> @handle_exception
+    >>> def foo(raise_exception: bool):
+    >>>     if raise_exception:
+    >>>         raise TwelveDataApiException(500, "Erreur")
+    >>>     else:
+    >>>         return "Nothing hapenned"
+
+    Now, let's raise the exception from foo() :
+
+    >>> foo(raise_exception=True)
+    {"status": "error", "code": 500, "message": "Erreur"}
+
+    Finally, let's see what happens when no exception is raised :
+
+    >>> foo(raise_exception=False)
+    Nothing hapenned
     """
 
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)

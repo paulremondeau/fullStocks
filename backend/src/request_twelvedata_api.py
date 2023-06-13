@@ -46,10 +46,9 @@ twelvedata_api_config = read_twelvedata_api_config_file(twelvedata_api_config_pa
 
 
 def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str | list]:
-    """Wrapps the Twelve Data API for result quality checks.
+    """Format Twelve Data API response.
 
-    This function take care of all the exceptions concerning the data
-    Twelve Data API data quality.
+    This function take care of the data output from Twelve Data API.
 
     Parameters
     ----------
@@ -59,9 +58,7 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
     Returns
     -------
     Dict[str, str | list]
-        The dict of the app API.
-        If no exception was raised, the return dict is like {"status": "ok", "data": "}
-        If an exception was raised, returns a dict like {"status": "ko", "code": 500, "message": "Exception description"}
+        This is the result format of the backend.
 
     Raises
     ------
@@ -69,6 +66,31 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
         Exception with the Twelve Data API
         code: the error code
         message: message related to the exception
+
+    Examples
+    ----------
+
+    If the Twelve Data API returns good quality results for the ressource :
+
+    >>> check_twelvedata_api_response(requests.get("http://api.twelvedata.com/ressource"))
+    {"status": "ok", "data": ...}
+
+    If the URL is ressources does not exists on the API :
+
+    >>> check_twelvedata_api_response(requests.get("http://api.twelvedata.com/badRessource"))
+    {"status": "error",  "code": 404, "message": "Not found"}
+
+    If an error occured from Twelve Data API :
+
+    >>> check_twelvedata_api_response(requests.get("http://api.twelvedata.com/badRessource"))
+    {"status": "error",  "code": 429, "message": "You have run out of API credits for the current minute."}
+
+    For a full list of errors, see https://twelvedata.com/docs#errors
+
+    If the ressource is not what was expected :
+
+    >>> check_twelvedata_api_response(requests.get("http://api.twelvedata.com/badRessource"))
+    {"status": "error", "code": 500, "message": AssertionError or TypeCheckError message}
 
     """
     status_code_requests = response.status_code
@@ -103,7 +125,7 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
 
 
 @handle_exception
-def request_stock_time_series(
+def get_stock_timeseries(
     symbol: str, api_key: str
 ) -> Dict[str, str | int | pd.DataFrame]:
     """Request the twelve data API for stock informations.
@@ -123,6 +145,38 @@ def request_stock_time_series(
         res["status"] is ok or error
             - if status is error, dict contains code of error and message
             - if status is ok, dict contains exchange and data in dataframe
+
+    Examples
+    ----------
+
+    Request time series for Apple :
+
+    >>> res = get_stock_timeseries("AAPL", API_KEY)
+    >>> res['status']
+    ok
+    >>> res['exchange']
+    NASDAS
+    >>> res['data']
+        datetime
+    2019-06-20 04:00:00     49.69750
+    2019-06-20 12:00:00     49.84485
+    2019-06-21 04:00:00     50.06215
+    2019-06-21 12:00:00     49.69250
+    2019-06-24 04:00:00     49.87000
+                            ...
+    2023-06-06 09:30:00    179.16000
+    2023-06-07 09:30:00    177.82001
+    2023-06-08 09:30:00    180.53999
+    2023-06-09 09:30:00    181.03999
+    2023-06-12 09:30:00    183.84000
+    Name: close, Length: 1228, dtype: float64
+
+    If something went wrong :
+
+    >>> get_stock_timeseries("AAPL", API_KEY)
+    {"status": "error", "code": 500, "message": "Erreur"}
+
+    See :func:`src.exceptions_twelvedata_api.handle_exception` for more informations on possible errors.
     """
 
     # API request
@@ -198,8 +252,29 @@ def get_markets_state(api_key: str) -> Dict[str, str | int | pd.DataFrame]:
     Dict[str, str | int | pd.DataFrame]
         Dict[str, str | int | pd.DataFrame]
         res["status"] is ok or error
-            - if status is error, dict contains code of error and message
-            - if status is ok, dict contains market state dataframe
+        If status is error, dict contains code of error and message
+        If status is ok, dict contains market state dataframe
+
+    Examples
+    ----------
+
+    If all goes right :
+
+    >>> res = get_markets_state(API_KEY)
+    >>> res['status']
+    ok
+    >>> res['data']
+       exchange         country  isMarketOpen      timeToOpen     timeToClose
+    0      NYSE   United States          True 0 days 00:00:00 0 days 02:56:09
+    3    NASDAQ   United States          True 0 days 00:00:00 0 days 02:56:09
+
+    If something went wrong :
+
+    >>> get_markets_state(API_KEY)
+    {"status": "error", "code": 500, "message": "Erreur"}
+
+    See :func:`src.exceptions_twelvedata_api.handle_exception` for more informations on possible errors.
+
     """
     params = {"apikey": api_key}
     response = requests.get(twelvedata_api_config["market_url"], params=params)

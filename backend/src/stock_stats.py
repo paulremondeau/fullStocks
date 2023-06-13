@@ -46,12 +46,36 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
         The data, sorted in ascending time.
 
     symbol : str
-        The stock symbol
+        The stock symbol.
 
     Returns
     -------
     Dict[str, float | str]
         The result dict.
+
+    Examples
+    ----------
+
+    >>> data = pd.Series(
+    >>>     [1, 5, 7, 2, 3],
+    >>>     index=pd.Index(
+    >>>         [
+    >>>             pd.Timestamp(0, unit="d"),
+    >>>             pd.Timestamp(7, unit="d"),
+    >>>             pd.Timestamp(3, unit="d"),
+    >>>             pd.Timestamp(4, unit="d"),
+    >>>             pd.Timestamp(365, unit="d"),
+    >>>         ]
+    >>>     ),
+    >>> )
+    >>> evaluate_stats_information(data, "AAPL")
+    {
+        'symbol': 'AAPL',
+        'cumulativeReturn': -40.0,
+        'annualizedCumulativeReturn': 200.0,
+        'annualizedVolatility': 2.41
+    }
+
     """
 
     cumulative_return: float = evaluate_cumulative_return(data)
