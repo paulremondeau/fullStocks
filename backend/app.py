@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+"""app.py:  app
+
+This is the main app application file.
+"""
+
+
 __author__ = "Paul RÉMONDEAU"
 __copyright__ = "Paul RÉMONDEAU"
 __version__ = "1.0.0"
@@ -28,12 +35,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
 
-from src.utils import (
-    request_stock_time_series,
-    format_sending_data,
-    evaluate_stats_information,
-    get_markets_state,
-)
+from src import request_twelvedata_api, stock_stats, utils
+
 from config import API_KEY, API_PLAN, FRONTEND_URL
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -218,9 +221,10 @@ def check_market_state() -> Dict[str, str]:
     status = "ok"
 
     logger.info(f"Fetching data from Twelve data API...")
-    result_from_twelve_data = get_markets_state(API_KEY)
+    result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
     twelve_data_status = result_from_twelve_data["status"]
-    if twelve_data_status == "ko":
+
+    if twelve_data_status == "error":
         logger.warning(f"Fetching data from Twelve data API failed.")
         status = "ko"
         result_data = None
@@ -228,6 +232,7 @@ def check_market_state() -> Dict[str, str]:
     else:
         logger.info(f"Fetching data from Twelve data API succeded !")
         data_market = result_from_twelve_data["data"]
+        data_market["dateCheck"] = datetime.datetime.now()
         for data_exchange in data_market.iloc:
             exchange = data_exchange["exchange"]
 
@@ -322,14 +327,16 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
             stocks_date = stock_time_series_symbol_data.dateValue
             stock_values = stock_time_series_symbol_data.stockValues
             time_series_df = pd.Series(stock_values, index=stocks_date)
-            json_stats = evaluate_stats_information(time_series_df, symbol)
+            json_stats = stock_stats.evaluate_stats_information(time_series_df, symbol)
             logger.info(f"Data for symbol {symbol} retrieved from database !")
 
     if method in ["POST", "PUT"]:
         logger.info(
             f"Fetching data for symbol {symbol} with method {method} from Twelve data API..."
         )
-        result_from_twelve_data = request_stock_time_series(symbol, API_KEY)
+        result_from_twelve_data = request_twelvedata_api.request_stock_time_series(
+            symbol, API_KEY
+        )
         twelve_data_status = result_from_twelve_data["status"]
 
         if twelve_data_status == "error":
@@ -350,7 +357,7 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
             logger.info(
                 f"Fetching data for symbol {symbol} with method {method} from Twelve data API succeded !"
             )
-            json_stats = evaluate_stats_information(time_series, symbol)
+            json_stats = stock_stats.evaluate_stats_information(time_series, symbol)
             stocks_date = list(time_series.index)
             stock_values = list(time_series.values)
 
@@ -391,7 +398,7 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
                     logger.info(f"Data for symbol {symbol} in database updated !")
 
     logger.info(f"Formating data for the frontend...")
-    response_formatted_data: List[List[int | float]] = format_sending_data(
+    response_formatted_data: List[List[int | float]] = utils.format_sending_data(
         stocks_date, stock_values
     )
     logger.info(f"Data succesfuly formated for the frontend !")

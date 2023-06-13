@@ -1,0 +1,36 @@
+{
+    "timeseries_url": "https://api.twelvedata.com/time_series",
+    "timeseries_params": {
+        "interval": "8h",
+        "outputsize": "5000",
+        "format": "json"
+    },
+    "timeseries_meta_keys": [
+        "symbol",
+        "interval",
+        "currency",
+        "exchange_timezone",
+        "exchange",
+        "mic_code",
+        "type"
+    ],
+    "timeseries_values_keys": [
+        "datetime",
+        "open",
+        "high",
+        "low",
+        "volume",
+        "close"
+    ],
+    "market_url": "https://api.twelvedata.com/market_state",
+    "market_keys": [
+        "name",
+        "code",
+        "country",
+        "is_market_open",
+        "time_to_open",
+        "time_to_close",
+        "time_after_open"
+    ],
+    "symbols_url": "https://api.twelvedata.com/stocks"
+}
