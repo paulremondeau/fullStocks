@@ -74,6 +74,9 @@ html_theme = "sphinx_rtd_theme"  #'alabaster'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
+rst_prolog = """
+:github_url: https://github.com/paulremondeau/fullStocks
+"""
 
 # -- Options for PDF output -------------------------------------------------
 # pdf_documents = [
