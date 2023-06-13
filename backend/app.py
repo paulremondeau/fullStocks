@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+"""app.py:  app
+
+This is the main app application file.
+"""
+
+
 __author__ = "Paul RÉMONDEAU"
 __copyright__ = "Paul RÉMONDEAU"
 __version__ = "1.0.0"
@@ -28,12 +35,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
 
-from src.utils import (
-    request_stock_time_series,
-    format_sending_data,
-    evaluate_stats_information,
-    get_markets_state,
-)
+from src import request_twelvedata_api, stock_stats, utils
+
 from config import API_KEY, API_PLAN, FRONTEND_URL
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -70,6 +73,7 @@ cors = CORS(
     },
 )
 logger.info("Backend server initialized.")
+
 # =================================================================================================
 #     Database
 # =================================================================================================
@@ -131,23 +135,6 @@ class MarketStateSchema(ma.Schema):
         )
 
 
-# class SymbolExchange(db.Model):
-#     symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
-#     exchange = db.Column(db.String(EXCHANGE_LENGTH))
-
-#     def __init__(self, symbol, exchange):
-#         self.symbol = symbol
-#         self.exchange = exchange
-
-
-# class SymbolExchangeSchema(ma.Schema):
-#     class Meta:
-#         fields = (
-#             "symbol",
-#             "exchange",
-#         )
-
-
 db.create_all()
 
 logger.info("Database initialized.")
@@ -180,23 +167,21 @@ def check_symbol_data(symbol: str) -> Dict[str, str]:
     # data_symbol = StockTimeSeries.query.get(symbol)
     if data_symbol is None:
         response = {"dataExists": False}
-        logger.info(f"No data found for symbol {symbol}.")
+
     else:
         response = {"dataExists": True}
-        logger.info(f"Data found for symbol {symbol}.")
+
         time_delta = datetime.datetime.today() - data_symbol.dateValue[-1]
         data_is_fresh = time_delta <= datetime.timedelta(days=1)
         response["dataIsFresh"] = data_is_fresh
-        logger.info(f"Data is fresh : {data_is_fresh}.")
 
         if not data_is_fresh:
             exchange = data_symbol.exchange
             exchange_data = db.session.get(MarketState, exchange)
             market_open = exchange_data.isMarketOpen
             response["isMarketOpen"] = market_open
-            logger.info(f"Exchange {exchange} is open : {market_open}.")
 
-    logger.info(f"Function check_symbol_data({symbol}) completed !")
+    logger.info(f"Function check_symbol_data({symbol}) completed ! Result : {response}")
     return response
 
 
@@ -212,36 +197,31 @@ def check_market_state() -> Dict[str, str]:
     ...
         ...
     """
-    method = request.method
+
     logger.info(f"Starting function check_market_state()...")
-    logger.info(f"Method: {method}")
     status = "ok"
 
-    logger.info(f"Fetching data from Twelve data API...")
-    twelve_data_status, data_market = get_markets_state(API_KEY)
-    if twelve_data_status == "ko":
-        logger.warning(f"Fetching data from Twelve data API failed.")
+    result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
+    twelve_data_status = result_from_twelve_data["status"]
+
+    if twelve_data_status == "error":
         status = "ko"
         result_data = None
 
     else:
-        logger.info(f"Fetching data from Twelve data API succeded !")
-
+        data_market = result_from_twelve_data["data"]
+        data_market["dateCheck"] = datetime.datetime.now()
         for data_exchange in data_market.iloc:
             exchange = data_exchange["exchange"]
 
-            # logger.info(f"Processing data for exchange {exchange}...")
             country = data_exchange["country"]
             isMarketOpen = data_exchange["isMarketOpen"]
             timeToOpen = data_exchange["timeToOpen"]
             timeToClose = data_exchange["timeToClose"]
             dateCheck = data_exchange["dateCheck"]
 
-            # logger.info(f"Checking if exchange {exchange} exists in database...")
             old_exchange_data = db.session.get(MarketState, exchange)
             if old_exchange_data is None:
-                # logger.info(f"No data for exchange {exchange} in database.")
-                # logger.info(f"Adding data for {exchange} to database...")
                 new_exchange_data = MarketState(
                     exchange,
                     country,
@@ -252,11 +232,8 @@ def check_market_state() -> Dict[str, str]:
                 )
                 db.session.add(new_exchange_data)
                 db.session.commit()
-                # logger.info(f"Data for {exchange} added to database !")
 
             else:
-                # logger.info(f"Data for exchange {exchange} found in database.")
-                # logger.info(f"Updating data for {exchange} in database...")
                 old_exchange_data.country = country
                 old_exchange_data.isMarketOpen = isMarketOpen
                 old_exchange_data.timeToOpen = timeToOpen
@@ -264,7 +241,6 @@ def check_market_state() -> Dict[str, str]:
                 old_exchange_data.dateCheck = dateCheck
 
                 db.session.commit()
-                # logger.info(f"Data for exchange {exchange} updated in database !")
 
         result_data = [json.loads(x.to_json()) for x in data_market.iloc]
 
@@ -306,89 +282,68 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
     if method == "GET":
         stock_time_series_symbol_data = db.session.get(StockTimeSeries, symbol)
         if stock_time_series_symbol_data is None:
-            logger.warning(
-                f"No data in database for symbol {symbol} with method {method}."
-            )
-            logger.warning(f"Request is KO. Returning None.")
             status = "ko"
             stocks_date = None
             stock_values = None
             json_stats = None
 
         else:
-            logger.info(f"Data in database for symbol {symbol} with method {method}.")
-            logger.info(f"Request is OK. Retrieving data for symbol {symbol}...")
             stocks_date = stock_time_series_symbol_data.dateValue
             stock_values = stock_time_series_symbol_data.stockValues
             time_series_df = pd.Series(stock_values, index=stocks_date)
-            json_stats = evaluate_stats_information(time_series_df, symbol)
+            json_stats = stock_stats.evaluate_stats_information(time_series_df, symbol)
             logger.info(f"Data for symbol {symbol} retrieved from database !")
 
     if method in ["POST", "PUT"]:
-        logger.info(
-            f"Fetching data for symbol {symbol} with method {method} from Twelve data API..."
-        )
-        twelve_data_status, exchange, time_series = request_stock_time_series(
+        result_from_twelve_data = request_twelvedata_api.request_stock_time_series(
             symbol, API_KEY
         )
+        twelve_data_status = result_from_twelve_data["status"]
 
         if twelve_data_status == "error":
-            logger.warning(
-                f"Fetching data for symbol {symbol} with method {method} from Twelve data API failed."
-            )
-            logger.warning(f"Request is KO. Returning None.")
             status = "ko"
             stocks_date = None
             stock_values = None
             json_stats = None
 
         else:
-            logger.info(
-                f"Fetching data for symbol {symbol} with method {method} from Twelve data API succeded !"
-            )
-            json_stats = evaluate_stats_information(time_series, symbol)
+            exchange = result_from_twelve_data["exchange"]
+            time_series = result_from_twelve_data["data"]
+
+            json_stats = stock_stats.evaluate_stats_information(time_series, symbol)
             stocks_date = list(time_series.index)
             stock_values = list(time_series.values)
 
             # POST method
             if method == "POST":
-                logger.info(f"Adding data for symbol {symbol} in database... ")
                 new_timeseries = StockTimeSeries(
                     symbol, exchange, stocks_date, stock_values
                 )
                 db.session.add(new_timeseries)
 
                 db.session.commit()
-                logger.info(f"Data for symbol {symbol} added to database !")
 
             # PUT method
             elif method == "PUT":
-                logger.info(f"Fetching data for symbol {symbol} in database... ")
                 old_timeseries = db.session.get(StockTimeSeries, symbol)
                 if (
                     old_timeseries is None
                 ):  # TODO : unnecessary, should be removed after further testing...
-                    logger.warning(
-                        f"No data in database for symbol {symbol} with method {method}."
-                    )
-                    logger.warning(f"Request is KO. Returning None.")
                     status = "ko"
                     stocks_date = None
                     stock_values = None
                     json_stats = None
 
                 else:
-                    logger.info(f"Data for symbol {symbol} in database retrieved !")
                     old_timeseries.exchange = exchange
                     old_timeseries.dateValue = stocks_date
                     old_timeseries.stockValues = stock_values
 
                     db.session.commit()
-                    logger.info(f"Data for symbol {symbol} in database updated !")
 
-    logger.info(f"Formating data for the frontend...")
-    response_formatted_data = format_sending_data(stocks_date, stock_values)
-    logger.info(f"Data succesfuly formated for the frontend !")
+    response_formatted_data: List[List[int | float]] = utils.format_sending_data(
+        stocks_date, stock_values
+    )
 
     logger.info(f"Function request_data({symbol}) completed !")
     return json.dumps(

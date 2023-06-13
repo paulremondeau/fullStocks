@@ -23,7 +23,7 @@ const table = reactive({
           sortable: true,
         },
         {
-          label: "Annualized comulative return",
+          label: "Annualized cumulative return",
           field: "annualizedCumulativeReturn",
           width: "5%",
           sortable: true,
