@@ -5,7 +5,7 @@ on:
     branch: 
         adding_github_pages
   pull-request:
-    branc:
+    branch:
       main
 
 permissions:
