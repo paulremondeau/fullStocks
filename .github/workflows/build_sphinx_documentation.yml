@@ -1,0 +1,22 @@
+name: Build Sphinx Documentation
+
+on: 
+  push:
+  pull_request:
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - run: pip install -r requirements.txt
+        working-directory: './backend'
+
+      - name: Sphinx build
+        run: sphinx-build backend/docs/source _build

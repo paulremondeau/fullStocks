@@ -143,6 +143,8 @@ logger.info("Database initialized.")
 #     Routes
 # =================================================================================================
 
+# TODO : make swagger doc for sphinx
+
 
 @app.route("/check_symbol_data/<symbol>", methods=["GET"])
 def check_symbol_data(symbol: str) -> Dict[str, str]:
@@ -295,7 +297,7 @@ def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
             logger.info(f"Data for symbol {symbol} retrieved from database !")
 
     if method in ["POST", "PUT"]:
-        result_from_twelve_data = request_twelvedata_api.request_stock_time_series(
+        result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
             symbol, API_KEY
         )
         twelve_data_status = result_from_twelve_data["status"]
