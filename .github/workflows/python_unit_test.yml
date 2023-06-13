@@ -1,0 +1,31 @@
+# This workflow will run Python unit test with pytest.
+
+name: Python Unit Tests 
+
+on:
+  push:
+  pull_request:
+  
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+        
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set Python ${{ matrix.node-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        cache-dependency-path: backend/requirements.txt
+    - run: pip install -r requirements.txt
+      working-directory: './backend'
+    - run: pytest
+      working-directory: './backend'
