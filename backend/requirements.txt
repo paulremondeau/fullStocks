@@ -13,6 +13,3 @@ marshmallow-sqlalchemy
 Sphinx
 sphinx-rtd-theme
 sphinx-tabs
-mkdocs
-"mkdocstrings[python]"
-mkdocs-material
