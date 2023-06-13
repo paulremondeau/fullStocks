@@ -4,6 +4,9 @@ on:
   push:
     branch: 
         adding_github_pages
+  pull-request:
+    branc:
+      main
 
 permissions:
     contents: write
