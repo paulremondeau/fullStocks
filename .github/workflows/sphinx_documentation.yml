@@ -4,7 +4,7 @@ on:
   push:
     branch: 
         adding_github_pages
-  pull-request:
+  pull_request:
     branch:
       main
 
