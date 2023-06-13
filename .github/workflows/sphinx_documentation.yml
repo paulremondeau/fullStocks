@@ -3,10 +3,8 @@ name: Sphinx Documentation
 on: 
   push:
     branch: 
-        adding_github_pages
-  pull_request:
-    branch:
-      main
+      adding_github_pages
+
 
 permissions:
     contents: write
