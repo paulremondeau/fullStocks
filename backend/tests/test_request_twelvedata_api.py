@@ -254,6 +254,7 @@ def test_request_stock_time_series(requests_mock):
     )
 
     result = get_stock_timeseries("foo", "foo")
+    assert set(result.keys()) == {"status", "exchange", "timezone", "data"}
     print(result)
 
     result_status = result["status"]
@@ -261,6 +262,9 @@ def test_request_stock_time_series(requests_mock):
 
     result_exchange = result["exchange"]
     assert result_exchange == "NASDAQ"
+
+    result_timezone = result["timezone"]
+    assert result_timezone == "America/New_York"
 
     result_df = result["data"]
     assert result_df.equals(target_df)
