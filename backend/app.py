@@ -160,7 +160,7 @@ logger.info("Database initialized.")
 # TODO : make swagger doc for sphinx
 
 
-# TODO : update form-data usage
+# TODO : don't use form data, use url args
 @app.route("/symbols", methods=["GET"])
 def get_all_symbols_data():
     target_data_format = request.form["dataFormat"]
@@ -200,7 +200,9 @@ def create_symbol_data():
 
         except IntegrityError:
             # Data already exist
-            return redirect(f"/symbols/{symbol}", code=302)
+
+            # Try to use redirect into get
+            # return redirect(f"/symbols/{symbol}", code=302)
             return {"message": f"Data alrady exists, use /symbols/{symbol}"}, 409
 
     else:
@@ -213,6 +215,7 @@ def create_symbol_data():
     return jsonify(result_from_twelve_data), 201
 
 
+# TODO : don't use form data, use url args
 @app.route("/symbols/<symbol>", methods=["GET"])
 def get_symbol_data(symbol: str):
     target_data_format = request.form["dataFormat"]
@@ -231,6 +234,7 @@ def get_symbol_data(symbol: str):
         return result, 200
 
 
+# TODO :finish this
 @app.route("/symbols/<symbol>", methods=["PUT"])
 def update_symbol_data(symbol: str):
     max_delta = request.form["maxDelta"]

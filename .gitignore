@@ -41,3 +41,5 @@ config.*
 ## Sphinx
 backend/docs/sphinx
 backend/docs/build
+
+old_app.py
