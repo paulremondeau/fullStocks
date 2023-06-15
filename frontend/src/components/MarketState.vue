@@ -22,7 +22,7 @@ import {Duration} from "luxon";
 ///// Timer /////
 const currentTime = ref(0);
 const updateCurrentTime = () => {
-    if (!props.updateMarket[0]) {
+    if (!props.doUpdateMarket[0]) {
 
         if (currentTime.value > 1000) { // To avoid big big value and slow down
             currentTime.value = 0
@@ -57,7 +57,7 @@ function openOrClose (exchangeData) {
 function updateTimerMarket(){
     return new Promise((resolve, reject) => {
         // If updateMarket is false
-        if (!props.updateMarket[0]) {
+        if (!props.doUpdateMarket[0]) {
             for (const exchangeData of props.marketData){
                 let indexData = props.marketData.indexOf(exchangeData)
                 if (exchangeData.isMarketOpen) {     
@@ -65,7 +65,7 @@ function updateTimerMarket(){
                     if (exchangeData.timeToClose <= 0){
                         
                         // This will trigger the emit and stop the updating
-                        props.updateMarket[0] = true
+                        props.doUpdateMarket[0] = true
                         
                     } else {
                     props.marketData[indexData] = exchangeData
@@ -75,7 +75,7 @@ function updateTimerMarket(){
                     if (exchangeData.timeToOpen <= 0){
                         
                         // This will trigger the emit and stop the updating
-                        props.updateMarket[0] = true
+                        props.doUpdateMarket[0] = true
                         
                     } else {
                     props.marketData[indexData] = exchangeData
@@ -94,7 +94,7 @@ const props = defineProps({
    * The markets data.
    */
   marketData: Object,
-  updateMarket: Object,
+  doUpdateMarket: Object,
 
 })
 
@@ -106,7 +106,7 @@ watch(currentTime, () => {
     updateTimerMarket()
         .then((res) => {
             // If updateMarket is true
-            if (props.updateMarket[0]) {
+            if (props.doUpdateMarket[0]) {
                 emit('updateMarket')
             }
         })

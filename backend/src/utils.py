@@ -88,72 +88,6 @@ def read_twelvedata_api_config_file(file_path: str):
     return res
 
 
-# def format_sending_data(
-#     stock_dates: List[pd.Timestamp] | None,
-#     stock_time_series: List[float] | None,
-#     performance: bool = True,
-# ) -> List[List[int | float]]:
-#     """Format data to send to the frontend.
-
-#     This function pre-process the data before sending to
-#     the front-end. The goal is to match the apexcharts line chart
-#     format, where a point is [12345, 1.0].
-
-#     Parameters
-#     ----------
-#     stock_dates : List[pd.Timestamp] | None
-#         The timestamps data.
-#     stock_time_series : List[float] | None
-#         The stock values data.
-#     performance : bool, optional
-#         If true, transforms data to create performance data, by
-#         default True
-
-#     Returns
-#     -------
-#     List[List[int | float]]
-#         The data formatted.
-
-#     Examples
-#     ----------
-#     >>> import pandas as pd
-#     >>> stock_time_series = [3, 1, 2]
-#     >>> stock_dates = [
-#     ...     pd.Timestamp(1, unit="ms"),
-#     ...     pd.Timestamp(2, unit="ms"),
-#     ...     pd.Timestamp(3, unit="ms"),
-#     ... ]
-#     >>> format_sending_data(stock_time_series, stock_dates, performance = False)
-#     [[1, 3], [2,1], [3, 2]]
-#     >>> format_sending_data(stock_time_series, stock_dates, performance = True)
-#     [[1, 100.0], [2, 33.33], [3, 66.67]]
-#     """
-
-#     if stock_dates is None or stock_time_series is None:
-#         result = []
-
-#     else:
-#         stocks_date_timestamps = [
-#             int(date_value.timestamp() * 1000) for date_value in stock_dates
-#         ]
-
-#         if performance:
-#             # Format for performance
-#             try:
-#                 stock_time_series = list(
-#                     pd.Series(stock_time_series) / stock_time_series[0] * 100
-#                 )
-#             except IndexError:
-#                 stock_time_series = []
-
-#         result = [
-#             [timestamp, float(f"{ts_value:.2f}")]
-#             for timestamp, ts_value in zip(stocks_date_timestamps, stock_time_series)
-#         ]
-
-#     return result
-
-
 def series_to_apexcharts(
     timeseries: pd.Series | None,
     performance: bool = True,
@@ -199,7 +133,11 @@ def series_to_apexcharts(
         result = [
             [
                 int(index.timestamp() * 1000),
-                (value / timeseries[0] * 100 if performance else value),
+                (
+                    float(f"{value / timeseries[0] * 100:.2f}")
+                    if performance
+                    else float(f"{value:.2f}")
+                ),
             ]
             for index, value in timeseries.items()
         ]

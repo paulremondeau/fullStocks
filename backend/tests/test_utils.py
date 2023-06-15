@@ -30,41 +30,22 @@ current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
 sys.path.append(parent)
 
-from src.utils import format_sending_data, read_twelvedata_api_config_file
+from src.utils import series_to_apexcharts, read_twelvedata_api_config_file
 
 # ===============================
 #  Tests
 # ===============================
 
 
-def test_format_sending_data():
+def test_series_to_apexcharts():
     # Should return None if one of the parameters is None
-    assert format_sending_data(None, "foo", "foo") == []
-    assert format_sending_data("foo", None, "foo") == []
+    assert series_to_apexcharts(None, "foo") == []
 
     # Should return an empty list if input data are empty lists
     stock_dates = []
     stock_time_series = []
-    assert format_sending_data(stock_dates, stock_time_series) == []
-
-    # Should return data correctly if one data list is shorter than the other
-    stock_dates = [pd.Timestamp(1, unit="ms"), pd.Timestamp(2, unit="ms")]
-    stock_time_series = [1, 2, 3]
-    assert format_sending_data(stock_dates, stock_time_series) == [
-        [1, 100.0],
-        [2, 200.0],
-    ]
-
-    stock_dates = [
-        pd.Timestamp(1, unit="ms"),
-        pd.Timestamp(2, unit="ms"),
-        pd.Timestamp(3, unit="ms"),
-    ]
-    stock_time_series = [1, 2]
-    assert format_sending_data(stock_dates, stock_time_series) == [
-        [1, 100.0],
-        [2, 200.0],
-    ]
+    timeseries = pd.Series(stock_time_series, index=stock_dates)
+    assert series_to_apexcharts(timeseries) == []
 
     # Should return data correctly in either performance or normal mode
     stock_dates = [
@@ -73,13 +54,14 @@ def test_format_sending_data():
         pd.Timestamp(3, unit="ms"),
     ]
     stock_time_series = [3, 1, 2]
-    assert format_sending_data(stock_dates, stock_time_series) == [
+    timeseries = pd.Series(stock_time_series, index=stock_dates)
+    assert series_to_apexcharts(timeseries) == [
         [1, 100.0],
         [2, 33.33],
         [3, 66.67],
     ]
 
-    assert format_sending_data(stock_dates, stock_time_series, performance=False) == [
+    assert series_to_apexcharts(timeseries, performance=False) == [
         [1, 3],
         [2, 1],
         [3, 2],

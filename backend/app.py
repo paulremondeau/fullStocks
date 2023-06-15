@@ -137,7 +137,7 @@ class MarketState(db.Model):
     isMarketOpen = db.Column(db.Boolean)
     timeToOpen = db.Column(db.PickleType())
     timeToClose = db.Column(db.PickleType())
-    dateCheck = db.Column(db.DateTime)
+    dateCheck = db.Column(db.Float)
 
     def __init__(
         self, exchange, country, isMarketOpen, timeToOpen, timeToClose, dateCheck
@@ -201,16 +201,13 @@ def get_all_symbols_data():
 
 @app.route("/symbols", methods=["POST"])
 def create_symbol_data():
-    symbol = request.form["symbol"]
+    requests_body = json.loads(request.data)
 
-    target_data_format: str = request.args.get("dataFormat", default=None, type=str)
-    localize: bool = request.args.get("localize", default=False, type=json.loads)
-    performance: bool = request.args.get("performance", default=True, type=json.loads)
-    max_delta = request.args.get("maxDelta", default="4h", type=str)
+    symbol = requests_body["symbol"]
 
     if db.session.get(StockTimeSeries, symbol) is not None:
         # Data already exist
-        code = 302
+        return {"message": f"Data alrady exists, use GET /symbols/{symbol}"}, 200
 
         # return {"message": f"Data alrady exists, use /symbols/{symbol}"}, 409
 
@@ -231,29 +228,9 @@ def create_symbol_data():
             db.session.add(new_timeseries)
             db.session.commit()
 
-            code = 201
-
+            return {"message": f"Data created, use GET /symbols/{symbol}"}, 201
         else:
             return result_from_twelve_data, 500
-
-    # Retrieve data now
-
-    params = "&".join(
-        [
-            "=".join([param_name, json.dumps(param_value)])
-            for param_name, param_value in [
-                ("dataFormat", target_data_format),
-                ("localize", localize),
-                ("performance", performance),
-                ("maxDelta", max_delta),
-            ]
-        ]
-    )
-
-    return redirect(
-        f"/symbols/{symbol}?{params}",
-        code=302,
-    )
 
 
 @app.route("/symbols/<symbol>", methods=["GET"])
@@ -268,17 +245,19 @@ def get_symbol_data(symbol: str):
 
     else:
         result = stock_timeseries_schema.dump(data)
+        stats_table = stock_stats.evaluate_stats_information(
+            result["timeseries"], symbol
+        )
+
         result["timeseries"] = utils.series_to_apexcharts(
             result["timeseries"], performance
         )
-        return result, 200
+
+        return {"data": result, "stats": stats_table}, 200
 
 
 @app.route("/symbols/<symbol>", methods=["PUT"])
 def update_symbol_data(symbol: str):
-    target_data_format: str = request.args.get("dataFormat", default="", type=str)
-    localize: bool = request.args.get("localize", default=False, type=json.loads)
-    performance: bool = request.args.get("performance", default=True, type=json.loads)
     max_delta = request.args.get("maxDelta", default="4h", type=str)
     if max_delta not in DELTA_CHOICES:
         return {
@@ -298,6 +277,9 @@ def update_symbol_data(symbol: str):
         time_delta = datetime.datetime.today() - old_data.timeseries.index[-1]
         if time_delta < datetime.timedelta(**{delta_unit: delta_size}):
             # Data is fresh enough
+            logger.warning(
+                f"Last data point is younger than {delta_size} {delta_unit}, no new data available."
+            )
             return {
                 "message": f"Last data point is younger than {delta_size} {delta_unit}, no new data available."
             }, 304
@@ -307,10 +289,11 @@ def update_symbol_data(symbol: str):
             exchange_data = db.session.get(MarketState, old_data.exchange)
 
             if not exchange_data:
-                return {}, 204
+                return {"message": f"No market data for {old_data.exchange}"}, 409
 
             if not exchange_data.isMarketOpen:
                 # Market is close
+                logger.warning(f"{old_data.exchange} is closed, no new data avilable.")
                 return {
                     "message": f"{old_data.exchange} is closed, no new data avilable."
                 }, 304
@@ -323,22 +306,9 @@ def update_symbol_data(symbol: str):
                     old_data.timeseries = result_from_twelve_data["data"]
                     db.session.commit()
 
-                    params = "&".join(
-                        [
-                            "=".join([param_name, json.dumps(param_value)])
-                            for param_name, param_value in [
-                                ("dataFormat", target_data_format),
-                                ("localize", localize),
-                                ("performance", performance),
-                                ("maxDelta", max_delta),
-                            ]
-                        ]
-                    )
-
-                    return redirect(
-                        f"/symbols/{symbol}?{params}",
-                        code=302,
-                    )
+                    return {
+                        "message": f"Data succesfully updated, use GET /symbols/{symbol}"
+                    }, 200
 
                 else:
                     return result_from_twelve_data, 500
@@ -361,10 +331,8 @@ def create_market_state():
     data = MarketState.query.all()
     if data:
         # Data already exists
-        code = 302
-        pass
 
-        # return {"message": f"Data alrady exists, use GET /market"}, 409
+        return {"message": f"Data alrady exists, use GET /market"}, 200
 
     else:
         result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
@@ -380,22 +348,17 @@ def create_market_state():
                         isMarketOpen=data_exchange["isMarketOpen"],
                         timeToOpen=data_exchange["timeToOpen"],
                         timeToClose=data_exchange["timeToClose"],
-                        dateCheck=datetime.datetime.now(),
+                        dateCheck=datetime.datetime.now().timestamp(),
                     )
                 )
 
             db.session.commit()
-            code = 201
-            # return redirect( f"/market", code=201,)
 
         else:
             # Error
             return result_from_twelve_data, 500
 
-    return redirect(
-        f"/market",
-        code=302,
-    )
+    return {"message": f"Data succesfully created, use GET /market"}, 201
 
 
 @app.route("/market", methods=["PUT"])
@@ -423,7 +386,7 @@ def update_market_state():
                             isMarketOpen=data_exchange["isMarketOpen"],
                             timeToOpen=data_exchange["timeToOpen"],
                             timeToClose=data_exchange["timeToClose"],
-                            dateCheck=datetime.datetime.now(),
+                            dateCheck=datetime.datetime.now().timestamp(),
                         )
                     )
 
@@ -431,7 +394,7 @@ def update_market_state():
                     old_exchange_data.isMarketOpen = data_exchange["isMarketOpen"]
                     old_exchange_data.timeToOpen = data_exchange["timeToOpen"]
                     old_exchange_data.timeToClose = data_exchange["timeToClose"]
-                    old_exchange_data.dateCheck = datetime.datetime.now()
+                    old_exchange_data.dateCheck = datetime.datetime.now().timestamp()
 
             db.session.commit()
 
@@ -439,10 +402,7 @@ def update_market_state():
             # Error
             return result_from_twelve_data, 500
 
-    return redirect(
-        f"/market",
-        code=302,
-    )
+    return {"message": f"Data succesfully updated, use GET /market"}, 200
 
 
 # Start the app
