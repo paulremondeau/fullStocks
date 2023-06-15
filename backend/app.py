@@ -25,6 +25,20 @@ convert_delta_unit = {
     "week": "weeks",
 }
 
+DELTA_CHOICES = [
+    "1min",
+    "5min",
+    "15min",
+    "30min",
+    "45min",
+    "1h",
+    "2h",
+    "4h",
+    "1day",
+    "1week",
+    "1month",
+]
+
 # =================================================================================================
 #     Libs
 # =================================================================================================
@@ -77,9 +91,8 @@ app.app_context().push()
 cors = CORS(
     app,
     resources={
-        r"/check_symbol_data/*": {"origins": FRONTEND_URL},
-        r"/get_symbol_data/*": {"origins": FRONTEND_URL},
-        r"/check_market_state/*": {"origins": FRONTEND_URL},
+        r"/symbols/*": {"origins": FRONTEND_URL},
+        r"/market": {"origins": FRONTEND_URL},
     },
 )
 logger.info("Backend server initialized.")
@@ -149,6 +162,9 @@ class MarketStateSchema(ma.Schema):
         )
 
 
+market_schema = MarketStateSchema()
+markets_schema = MarketStateSchema(many=True)
+
 db.create_all()
 
 logger.info("Database initialized.")
@@ -158,69 +174,93 @@ logger.info("Database initialized.")
 # =================================================================================================
 
 # TODO : make swagger doc for sphinx
+# TODO : instead of redirect, maybe respond the code and client will decide what to do ?
 
 
-# TODO : don't use form data, use url args
 @app.route("/symbols", methods=["GET"])
 def get_all_symbols_data():
-    target_data_format = request.form["dataFormat"]
-    localize = json.loads(request.form["localize"])
-    performance = json.loads(request.form["performance"])
+    target_data_format: str = request.args.get(
+        "dataFormat", default="apexcharts", type=str
+    )
+    localize: bool = request.args.get("localize", default=False, type=json.loads)
+    performance: bool = request.args.get("performance", default=True, type=json.loads)
 
     data = StockTimeSeries.query.all()
 
-    result = stocks_timeseries_schema.dump(data)
+    all_timeseries: Dict[
+        str, str | List[List[float | int]]
+    ] = stocks_timeseries_schema.dump(data)
 
-    for entry in result:
+    for entry in all_timeseries:
         entry["timeseries"] = utils.series_to_apexcharts(
             entry["timeseries"], performance
         )
 
-    return result, 200
+    return all_timeseries, 200
 
 
 @app.route("/symbols", methods=["POST"])
 def create_symbol_data():
     symbol = request.form["symbol"]
-    result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
-        symbol, API_KEY
-    )
 
-    if result_from_twelve_data["status"] == "ok":
-        try:
+    target_data_format: str = request.args.get("dataFormat", default=None, type=str)
+    localize: bool = request.args.get("localize", default=False, type=json.loads)
+    performance: bool = request.args.get("performance", default=True, type=json.loads)
+    max_delta = request.args.get("maxDelta", default="4h", type=str)
+
+    if db.session.get(StockTimeSeries, symbol) is not None:
+        # Data already exist
+        code = 302
+
+        # return {"message": f"Data alrady exists, use /symbols/{symbol}"}, 409
+
+    else:
+        # Data does not exists
+        result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
+            symbol, API_KEY
+        )
+
+        if result_from_twelve_data["status"] == "ok":
             new_timeseries = StockTimeSeries(
                 symbol,
-                result_from_twelve_data["exchange"],
-                result_from_twelve_data["timezone"],
-                result_from_twelve_data["data"],
+                exchange=result_from_twelve_data["exchange"],
+                timezone=result_from_twelve_data["timezone"],
+                timeseries=result_from_twelve_data["data"],
             )
 
             db.session.add(new_timeseries)
             db.session.commit()
 
-        except IntegrityError:
-            # Data already exist
+            code = 201
 
-            # Try to use redirect into get
-            # return redirect(f"/symbols/{symbol}", code=302)
-            return {"message": f"Data alrady exists, use /symbols/{symbol}"}, 409
+        else:
+            return result_from_twelve_data, 500
 
-    else:
-        return result_from_twelve_data, 500
+    # Retrieve data now
 
-    result_from_twelve_data["data"] = utils.series_to_apexcharts(
-        result_from_twelve_data["data"]
+    params = "&".join(
+        [
+            "=".join([param_name, json.dumps(param_value)])
+            for param_name, param_value in [
+                ("dataFormat", target_data_format),
+                ("localize", localize),
+                ("performance", performance),
+                ("maxDelta", max_delta),
+            ]
+        ]
     )
 
-    return jsonify(result_from_twelve_data), 201
+    return redirect(
+        f"/symbols/{symbol}?{params}",
+        code=302,
+    )
 
 
-# TODO : don't use form data, use url args
 @app.route("/symbols/<symbol>", methods=["GET"])
 def get_symbol_data(symbol: str):
-    target_data_format = request.form["dataFormat"]
-    localize = json.loads(request.form["localize"])
-    performance = json.loads(request.form["performance"])
+    target_data_format: str = request.args.get("dataFormat", default="", type=str)
+    localize: bool = request.args.get("localize", default=False, type=json.loads)
+    performance: bool = request.args.get("performance", default=True, type=json.loads)
     data = db.session.get(StockTimeSeries, symbol)
     if data is None:
         # Data does not exist
@@ -234,34 +274,24 @@ def get_symbol_data(symbol: str):
         return result, 200
 
 
-# TODO :finish this
 @app.route("/symbols/<symbol>", methods=["PUT"])
 def update_symbol_data(symbol: str):
-    max_delta = request.form["maxDelta"]
-    if max_delta not in [
-        "1min",
-        "5min",
-        "15min",
-        "30min",
-        "45min",
-        "1h",
-        "2h",
-        "4h",
-        "1day",
-        "1week",
-        "1month",
-    ]:
+    target_data_format: str = request.args.get("dataFormat", default="", type=str)
+    localize: bool = request.args.get("localize", default=False, type=json.loads)
+    performance: bool = request.args.get("performance", default=True, type=json.loads)
+    max_delta = request.args.get("maxDelta", default="4h", type=str)
+    if max_delta not in DELTA_CHOICES:
         return {
-            "message": 'Incorect time delta, should be within ["1min", "5min", "15min", "30min", "45min", "1h", "2h", "4h", "1day", "1week", "1month"]'
+            "message": f'Incorect time delta, should be within {", ".join(DELTA_CHOICES)}'
         }, 400
 
     old_data = db.session.get(StockTimeSeries, symbol)
     if old_data is None:
         # Data does not exist
         return {}, 204
+
     else:
         # Check if data is fresh enough
-
         delta_size = int(re.findall("\d+", max_delta)[0])
         delta_unit = convert_delta_unit[re.findall("\D+", max_delta)[0]]
 
@@ -275,6 +305,10 @@ def update_symbol_data(symbol: str):
         else:
             # Data is not fresh enough, now check if market is open
             exchange_data = db.session.get(MarketState, old_data.exchange)
+
+            if not exchange_data:
+                return {}, 204
+
             if not exchange_data.isMarketOpen:
                 # Market is close
                 return {
@@ -282,223 +316,132 @@ def update_symbol_data(symbol: str):
                 }, 304
 
             else:
-                pass
-
-
-@app.route("/symbols/<symbol>", methods=["DELETE"])
-def delete_symbol_data(symbol: str):
-    pass
-
-
-@app.route("/check_symbol_data/<symbol>", methods=["GET"])
-def check_symbol_data(symbol: str) -> Dict[str, str]:
-    """Check if data exists and is up-to-date in databse.
-
-    This function verifies if the data corresponding to the
-    stocks requested exists in database, and if the data is not
-    older than one day.
-
-    Parameters
-    ----------
-    symbol : str
-        The stock symbol we seeks information
-
-    Returns
-    -------
-    Dict[str, str]
-        The dict with response information
-    """
-    logger.info(f"Starting function check_symbol_data({symbol})...")
-    data_symbol = db.session.get(StockTimeSeries, symbol)
-    # data_symbol = StockTimeSeries.query.get(symbol)
-    if data_symbol is None:
-        response = {"dataExists": False}
-
-    else:
-        response = {"dataExists": True}
-
-        time_delta = datetime.datetime.today() - data_symbol.dateValue[-1]
-        data_is_fresh = time_delta <= datetime.timedelta(days=1)
-        response["dataIsFresh"] = data_is_fresh
-
-        if not data_is_fresh:
-            exchange = data_symbol.exchange
-            exchange_data = db.session.get(MarketState, exchange)
-            market_open = exchange_data.isMarketOpen
-            response["isMarketOpen"] = market_open
-
-    logger.info(f"Function check_symbol_data({symbol}) completed ! Result : {response}")
-    return response
-
-
-@app.route("/check_market_state", methods=["GET"])
-def check_market_state() -> Dict[str, str]:
-    """Check the states of the market
-
-    This function verifies if the markets are open.
-    Update information in the database.
-
-    Returns
-    -------
-    ...
-        ...
-    """
-
-    logger.info(f"Starting function check_market_state()...")
-    status = "ok"
-
-    result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
-    twelve_data_status = result_from_twelve_data["status"]
-
-    if twelve_data_status == "error":
-        status = "ko"
-        result_data = None
-
-    else:
-        data_market = result_from_twelve_data["data"]
-        data_market["dateCheck"] = datetime.datetime.now()
-        for data_exchange in data_market.iloc:
-            exchange = data_exchange["exchange"]
-
-            country = data_exchange["country"]
-            isMarketOpen = data_exchange["isMarketOpen"]
-            timeToOpen = data_exchange["timeToOpen"]
-            timeToClose = data_exchange["timeToClose"]
-            dateCheck = data_exchange["dateCheck"]
-
-            old_exchange_data = db.session.get(MarketState, exchange)
-            if old_exchange_data is None:
-                new_exchange_data = MarketState(
-                    exchange,
-                    country,
-                    isMarketOpen,
-                    timeToOpen,
-                    timeToClose,
-                    dateCheck,
+                result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
+                    symbol, API_KEY
                 )
-                db.session.add(new_exchange_data)
-                db.session.commit()
-
-            else:
-                old_exchange_data.country = country
-                old_exchange_data.isMarketOpen = isMarketOpen
-                old_exchange_data.timeToOpen = timeToOpen
-                old_exchange_data.timeToClose = timeToClose
-                old_exchange_data.dateCheck = dateCheck
-
-                db.session.commit()
-
-        result_data = [json.loads(x.to_json()) for x in data_market.iloc]
-
-    logger.info(f"Function check_market_state() finished !")
-    return json.dumps({"status": status, "data": result_data})
-
-
-@app.route("/get_symbol_data/<symbol>", methods=["POST", "GET", "PUT"])
-def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
-    """Retrieves symbol data.
-
-    This function retrieves data for the given symbol.
-    The function works different with the method request:
-    - GET : data is stored in the database. Data is then retrieved
-    from the database.
-    - POST : data does not exists in database. Data is fetched
-    from the Twelve Data API and stored in database.
-    - PUT data is stored in database but we want to fetch
-    from the Twelve DATA API nonetheless and update
-    the data in the database.
-
-
-    Parameters
-    ----------
-    symbol : str
-        The stock symbol of which we want the data.
-
-    Returns
-    -------
-    Dict[str, str | dict | List[list]]
-        Data for frontend.
-    """
-    method = request.method
-    logger.info(f"Starting function request_data({symbol})...")
-    logger.info(f"Method: {method}")
-    status = "ok"
-
-    # GET method
-    if method == "GET":
-        stock_time_series_symbol_data = db.session.get(StockTimeSeries, symbol)
-        if stock_time_series_symbol_data is None:
-            status = "ko"
-            stocks_date = None
-            stock_values = None
-            json_stats = None
-
-        else:
-            stocks_date = stock_time_series_symbol_data.dateValue
-            stock_values = stock_time_series_symbol_data.stockValues
-            time_series_df = pd.Series(stock_values, index=stocks_date)
-            json_stats = stock_stats.evaluate_stats_information(time_series_df, symbol)
-            logger.info(f"Data for symbol {symbol} retrieved from database !")
-
-    if method in ["POST", "PUT"]:
-        result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
-            symbol, API_KEY
-        )
-        twelve_data_status = result_from_twelve_data["status"]
-
-        if twelve_data_status == "error":
-            status = "ko"
-            stocks_date = None
-            stock_values = None
-            json_stats = None
-
-        else:
-            exchange = result_from_twelve_data["exchange"]
-            time_series = result_from_twelve_data["data"]
-
-            json_stats = stock_stats.evaluate_stats_information(time_series, symbol)
-            stocks_date = list(time_series.index)
-            stock_values = list(time_series.values)
-
-            # POST method
-            if method == "POST":
-                new_timeseries = StockTimeSeries(
-                    symbol, exchange, stocks_date, stock_values
-                )
-                db.session.add(new_timeseries)
-
-                db.session.commit()
-
-            # PUT method
-            elif method == "PUT":
-                old_timeseries = db.session.get(StockTimeSeries, symbol)
-                if (
-                    old_timeseries is None
-                ):  # TODO : unnecessary, should be removed after further testing...
-                    status = "ko"
-                    stocks_date = None
-                    stock_values = None
-                    json_stats = None
-
-                else:
-                    old_timeseries.exchange = exchange
-                    old_timeseries.dateValue = stocks_date
-                    old_timeseries.stockValues = stock_values
-
+                if result_from_twelve_data["status"] == "ok":
+                    old_data.timeseries = result_from_twelve_data["data"]
                     db.session.commit()
 
-    response_formatted_data: List[List[int | float]] = utils.format_sending_data(
-        stocks_date, stock_values
+                    params = "&".join(
+                        [
+                            "=".join([param_name, json.dumps(param_value)])
+                            for param_name, param_value in [
+                                ("dataFormat", target_data_format),
+                                ("localize", localize),
+                                ("performance", performance),
+                                ("maxDelta", max_delta),
+                            ]
+                        ]
+                    )
+
+                    return redirect(
+                        f"/symbols/{symbol}?{params}",
+                        code=302,
+                    )
+
+                else:
+                    return result_from_twelve_data, 500
+
+
+@app.route("/market", methods=["GET"])
+def get_market_state():
+    data = MarketState.query.all()
+
+    market: Dict[str, str | List[List[float | int]]] = markets_schema.dump(data)
+    market = pd.DataFrame(market)
+
+    market = [json.loads(x.to_json()) for x in market.iloc]
+
+    return market, 200
+
+
+@app.route("/market", methods=["POST"])
+def create_market_state():
+    data = MarketState.query.all()
+    if data:
+        # Data already exists
+        code = 302
+        pass
+
+        # return {"message": f"Data alrady exists, use GET /market"}, 409
+
+    else:
+        result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
+        if result_from_twelve_data["status"] == "ok":
+            data_market = result_from_twelve_data["data"]
+            for data_exchange in data_market.iloc:
+                # Adding each market one by one
+
+                db.session.add(
+                    MarketState(
+                        exchange=data_exchange["exchange"],
+                        country=data_exchange["country"],
+                        isMarketOpen=data_exchange["isMarketOpen"],
+                        timeToOpen=data_exchange["timeToOpen"],
+                        timeToClose=data_exchange["timeToClose"],
+                        dateCheck=datetime.datetime.now(),
+                    )
+                )
+
+            db.session.commit()
+            code = 201
+            # return redirect( f"/market", code=201,)
+
+        else:
+            # Error
+            return result_from_twelve_data, 500
+
+    return redirect(
+        f"/market",
+        code=302,
     )
 
-    logger.info(f"Function request_data({symbol}) completed !")
-    return json.dumps(
-        {
-            "symbol": symbol,
-            "data": response_formatted_data,
-            "stats": json_stats,
-            "status": status,
-        }
+
+@app.route("/market", methods=["PUT"])
+def update_market_state():
+    data = MarketState.query.all()
+    if not data:
+        # Data does not exist
+        return {}, 204
+
+    else:
+        result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
+        if result_from_twelve_data["status"] == "ok":
+            data_market = result_from_twelve_data["data"]
+            for data_exchange in data_market.iloc:
+                old_exchange_data = db.session.get(
+                    MarketState, data_exchange["exchange"]
+                )
+                if old_exchange_data is None:
+                    # TODO : adding new data to database through PUT request... Ugly...
+                    # No data for this exchange, lets add it to the database
+                    db.session.add(
+                        MarketState(
+                            exchange=data_exchange["exchange"],
+                            country=data_exchange["country"],
+                            isMarketOpen=data_exchange["isMarketOpen"],
+                            timeToOpen=data_exchange["timeToOpen"],
+                            timeToClose=data_exchange["timeToClose"],
+                            dateCheck=datetime.datetime.now(),
+                        )
+                    )
+
+                else:
+                    old_exchange_data.isMarketOpen = data_exchange["isMarketOpen"]
+                    old_exchange_data.timeToOpen = data_exchange["timeToOpen"]
+                    old_exchange_data.timeToClose = data_exchange["timeToClose"]
+                    old_exchange_data.dateCheck = datetime.datetime.now()
+
+            db.session.commit()
+
+        else:
+            # Error
+            return result_from_twelve_data, 500
+
+    return redirect(
+        f"/market",
+        code=302,
     )
 
 
