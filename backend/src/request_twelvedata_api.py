@@ -155,7 +155,9 @@ def get_stock_timeseries(
     >>> res['status']
     ok
     >>> res['exchange']
-    NASDAS
+    NASDAQ
+    >>> res['timezone']
+    America/New_York
     >>> res['data']
         datetime
     2019-06-20 04:00:00     49.69750
@@ -199,6 +201,7 @@ def get_stock_timeseries(
     ), "Meta data are not correct, check Twelve Data API"
 
     exchange = meta["exchange"]
+    timzezone = meta["exchange_timezone"]
 
     values = response_json["values"]
     # Check if values is not an empty list
@@ -230,7 +233,12 @@ def get_stock_timeseries(
 
     working_df: pd.Series = df["close"]
 
-    return {"status": "ok", "exchange": exchange, "data": working_df}
+    return {
+        "status": "ok",
+        "exchange": exchange,
+        "timezone": timzezone,
+        "data": working_df,
+    }
 
 
 @handle_exception

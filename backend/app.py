@@ -17,11 +17,34 @@ __logger__ = "app.py"
 
 LOG_CONFIG_FILE = "config/log_config.ini"
 
+convert_delta_unit = {
+    "min": "minutes",
+    "h": "hours",
+    "day": "days",
+    "month": "months",
+    "week": "weeks",
+}
+
+DELTA_CHOICES = [
+    "1min",
+    "5min",
+    "15min",
+    "30min",
+    "45min",
+    "1h",
+    "2h",
+    "4h",
+    "1day",
+    "1week",
+    "1month",
+]
+
 # =================================================================================================
 #     Libs
 # =================================================================================================
 
 import json
+import re
 import os
 import datetime
 from typing import Dict, List
@@ -30,10 +53,13 @@ import logging.config
 
 import pandas as pd
 
-from flask import Flask, request, jsonify
+
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
+from flask_swagger import swagger
+from flask_swagger_ui import get_swaggerui_blueprint
 
 from src import request_twelvedata_api, stock_stats, utils
 
@@ -46,7 +72,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # =================================================================================================
 
 
-logging.config.fileConfig(LOG_CONFIG_FILE)
+logging.config.fileConfig(os.path.join(basedir, LOG_CONFIG_FILE))
 logger = logging.getLogger(__logger__)
 logger.info("Logger initialized.")
 
@@ -67,9 +93,8 @@ app.app_context().push()
 cors = CORS(
     app,
     resources={
-        r"/check_symbol_data/*": {"origins": FRONTEND_URL},
-        r"/get_symbol_data/*": {"origins": FRONTEND_URL},
-        r"/check_market_state/*": {"origins": FRONTEND_URL},
+        r"/symbols/*": {"origins": FRONTEND_URL},
+        r"/market": {"origins": FRONTEND_URL},
     },
 )
 logger.info("Backend server initialized.")
@@ -89,19 +114,23 @@ COUNTRY_LENGTH = 30
 class StockTimeSeries(db.Model):
     symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
     exchange = db.Column(db.String(EXCHANGE_LENGTH))
-    dateValue = db.Column(db.PickleType())
-    stockValues = db.Column(db.PickleType())
+    timezone = db.Column(db.String(100))
+    timeseries = db.Column(db.PickleType())
 
-    def __init__(self, symbol, exchange, date_value, time_series):
+    def __init__(self, symbol, exchange, timezone, timeseries):
         self.symbol = symbol
         self.exchange = exchange
-        self.dateValue = date_value
-        self.stockValues = time_series
+        self.timezone = timezone
+        self.timeseries = timeseries
 
 
 class StockTimeSeriesSchema(ma.Schema):
     class Meta:
-        fields = ("symbol", "exchange", "dateValue", "stockValues")
+        fields = ("symbol", "exchange", "timezone", "timeseries")
+
+
+stock_timeseries_schema = StockTimeSeriesSchema()
+stocks_timeseries_schema = StockTimeSeriesSchema(many=True)
 
 
 class MarketState(db.Model):
@@ -110,7 +139,7 @@ class MarketState(db.Model):
     isMarketOpen = db.Column(db.Boolean)
     timeToOpen = db.Column(db.PickleType())
     timeToClose = db.Column(db.PickleType())
-    dateCheck = db.Column(db.DateTime)
+    dateCheck = db.Column(db.Float)
 
     def __init__(
         self, exchange, country, isMarketOpen, timeToOpen, timeToClose, dateCheck
@@ -135,6 +164,9 @@ class MarketStateSchema(ma.Schema):
         )
 
 
+market_schema = MarketStateSchema()
+markets_schema = MarketStateSchema(many=True)
+
 db.create_all()
 
 logger.info("Database initialized.")
@@ -143,225 +175,534 @@ logger.info("Database initialized.")
 #     Routes
 # =================================================================================================
 
-# TODO : make swagger doc for sphinx
+
+@app.route("/symbols", methods=["GET"])
+def get_all_symbols_data():
+    """Get all symbols at once.
+
+    Get the list of all the symbols data available in database.
+    ---
+    tags:
+        - SYMBOLS
+    responses:
+        200:
+            description: Request successulf, returning all symbols data from database and the evaluated stats infomartions.
+            schema:
+                type: object
+                properties:
+                    timeseries:
+                        type: array
+                        description: The symbols timeseries.
+                        items:
+                            type: array
+                            description: One symbol timeseries.
+                            items:
+                                type: array
+                                items:
+                                    type: number
+                                    description: A data point (time and value).
+                                minItems: 2
+                                maxItems: 2
+
+                    stats:
+                        type: array
+                        description: The list of the stats informations of the stocks.
+                        items:
+                            type: object
+                            properties:
+                                symbol:
+                                    type: string
+                                    description: The symbol name.
+                                cumulativeReturn:
+                                    type: number
+                                    description: The cumulative return of the stock.
+                                annualizedCumulativeReturn:
+                                    type: number
+                                    description: The annualized cummulative return of the stock.
+                                annualizedVolatility:
+                                    type: number
+                                    description: The annualized volatility of the stock.
 
 
-@app.route("/check_symbol_data/<symbol>", methods=["GET"])
-def check_symbol_data(symbol: str) -> Dict[str, str]:
-    """Check if data exists and is up-to-date in databse.
 
-    This function verifies if the data corresponding to the
-    stocks requested exists in database, and if the data is not
-    older than one day.
 
-    Parameters
-    ----------
-    symbol : str
-        The stock symbol we seeks information
-
-    Returns
-    -------
-    Dict[str, str]
-        The dict with response information
     """
-    logger.info(f"Starting function check_symbol_data({symbol})...")
-    data_symbol = db.session.get(StockTimeSeries, symbol)
-    # data_symbol = StockTimeSeries.query.get(symbol)
-    if data_symbol is None:
-        response = {"dataExists": False}
+    target_data_format: str = request.args.get(
+        "dataFormat", default="apexcharts", type=str
+    )
+    localize: bool = request.args.get("localize", default=False, type=json.loads)
+    performance: bool = request.args.get("performance", default=True, type=json.loads)
+
+    data = StockTimeSeries.query.all()
+
+    all_timeseries: Dict[
+        str, str | List[List[float | int]]
+    ] = stocks_timeseries_schema.dump(data)
+
+    stats_table = [
+        stock_stats.evaluate_stats_information(entry["timeseries"], entry["symbol"])
+        for entry in all_timeseries
+    ]
+
+    for entry in all_timeseries:
+        entry["timeseries"] = utils.series_to_apexcharts(
+            entry["timeseries"], performance
+        )
+
+    return {"timeseries": all_timeseries, "stats": stats_table}, 200
+
+
+@app.route("/symbols", methods=["POST"])
+def create_symbol_data():
+    """Add a new symbol.
+
+    Add a symbol timeseries to the database.
+    ---
+    tags:
+        - SYMBOLS
+
+    requestBody:
+        description: The parameter of the request.
+        required: true
+        schema:
+            type: object
+            properties:
+                symbol:
+                    type: string
+                    description: The symbol we want to add to the database.
+
+    parameters:
+        - name: body
+          in: body
+          requiered: true
+          schema:
+            type: object
+            properties:
+                symbol:
+                    type: string
+                    description: The symbol we want to add to the database.
+
+    responses:
+        200:
+            description: Data already exists in the database, you can use directly the get method.
+        201:
+            description: Data succesfuly created in the database, you can use the get method to retrieve it.
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+    """
+    requests_body = json.loads(request.data)
+
+    symbol = requests_body["symbol"]
+
+    if db.session.get(StockTimeSeries, symbol) is not None:
+        # Data already exist
+        return {"message": f"Data already exists, use GET /symbols/{symbol}"}, 200
+
+        # return {"message": f"Data already exists, use /symbols/{symbol}"}, 409
 
     else:
-        response = {"dataExists": True}
-
-        time_delta = datetime.datetime.today() - data_symbol.dateValue[-1]
-        data_is_fresh = time_delta <= datetime.timedelta(days=1)
-        response["dataIsFresh"] = data_is_fresh
-
-        if not data_is_fresh:
-            exchange = data_symbol.exchange
-            exchange_data = db.session.get(MarketState, exchange)
-            market_open = exchange_data.isMarketOpen
-            response["isMarketOpen"] = market_open
-
-    logger.info(f"Function check_symbol_data({symbol}) completed ! Result : {response}")
-    return response
-
-
-@app.route("/check_market_state", methods=["GET"])
-def check_market_state() -> Dict[str, str]:
-    """Check the states of the market
-
-    This function verifies if the markets are open.
-    Update information in the database.
-
-    Returns
-    -------
-    ...
-        ...
-    """
-
-    logger.info(f"Starting function check_market_state()...")
-    status = "ok"
-
-    result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
-    twelve_data_status = result_from_twelve_data["status"]
-
-    if twelve_data_status == "error":
-        status = "ko"
-        result_data = None
-
-    else:
-        data_market = result_from_twelve_data["data"]
-        data_market["dateCheck"] = datetime.datetime.now()
-        for data_exchange in data_market.iloc:
-            exchange = data_exchange["exchange"]
-
-            country = data_exchange["country"]
-            isMarketOpen = data_exchange["isMarketOpen"]
-            timeToOpen = data_exchange["timeToOpen"]
-            timeToClose = data_exchange["timeToClose"]
-            dateCheck = data_exchange["dateCheck"]
-
-            old_exchange_data = db.session.get(MarketState, exchange)
-            if old_exchange_data is None:
-                new_exchange_data = MarketState(
-                    exchange,
-                    country,
-                    isMarketOpen,
-                    timeToOpen,
-                    timeToClose,
-                    dateCheck,
-                )
-                db.session.add(new_exchange_data)
-                db.session.commit()
-
-            else:
-                old_exchange_data.country = country
-                old_exchange_data.isMarketOpen = isMarketOpen
-                old_exchange_data.timeToOpen = timeToOpen
-                old_exchange_data.timeToClose = timeToClose
-                old_exchange_data.dateCheck = dateCheck
-
-                db.session.commit()
-
-        result_data = [json.loads(x.to_json()) for x in data_market.iloc]
-
-    logger.info(f"Function check_market_state() finished !")
-    return json.dumps({"status": status, "data": result_data})
-
-
-@app.route("/get_symbol_data/<symbol>", methods=["POST", "GET", "PUT"])
-def request_data(symbol: str) -> Dict[str, str | dict | List[list]]:
-    """Retrieves symbol data.
-
-    This function retrieves data for the given symbol.
-    The function works different with the method request:
-    - GET : data is stored in the database. Data is then retrieved
-    from the database.
-    - POST : data does not exists in database. Data is fetched
-    from the Twelve Data API and stored in database.
-    - PUT data is stored in database but we want to fetch
-    from the Twelve DATA API nonetheless and update
-    the data in the database.
-
-
-    Parameters
-    ----------
-    symbol : str
-        The stock symbol of which we want the data.
-
-    Returns
-    -------
-    Dict[str, str | dict | List[list]]
-        Data for frontend.
-    """
-    method = request.method
-    logger.info(f"Starting function request_data({symbol})...")
-    logger.info(f"Method: {method}")
-    status = "ok"
-
-    # GET method
-    if method == "GET":
-        stock_time_series_symbol_data = db.session.get(StockTimeSeries, symbol)
-        if stock_time_series_symbol_data is None:
-            status = "ko"
-            stocks_date = None
-            stock_values = None
-            json_stats = None
-
-        else:
-            stocks_date = stock_time_series_symbol_data.dateValue
-            stock_values = stock_time_series_symbol_data.stockValues
-            time_series_df = pd.Series(stock_values, index=stocks_date)
-            json_stats = stock_stats.evaluate_stats_information(time_series_df, symbol)
-            logger.info(f"Data for symbol {symbol} retrieved from database !")
-
-    if method in ["POST", "PUT"]:
+        # Data does not exists
         result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
             symbol, API_KEY
         )
-        twelve_data_status = result_from_twelve_data["status"]
 
-        if twelve_data_status == "error":
-            status = "ko"
-            stocks_date = None
-            stock_values = None
-            json_stats = None
+        if result_from_twelve_data["status"] == "ok":
+            new_timeseries = StockTimeSeries(
+                symbol,
+                exchange=result_from_twelve_data["exchange"],
+                timezone=result_from_twelve_data["timezone"],
+                timeseries=result_from_twelve_data["data"],
+            )
+
+            db.session.add(new_timeseries)
+            db.session.commit()
+
+            return {"message": f"Data created, use GET /symbols/{symbol}"}, 201
+        else:
+            return result_from_twelve_data, 500
+
+
+@app.route("/symbols/<symbol>", methods=["GET"])
+def get_symbol_data(symbol: str):
+    """Retrieve one specific symbol.
+
+    Get timeseries and statistics informations of the given stock symbol.
+    ---
+    tags:
+        - SYMBOLS
+    parameters:
+        - in: path
+          name: symbol
+          schema:
+            type: string
+          required: true
+          description: The symbol we want to retrieve data from the database.
+    responses:
+        200:
+            description: Request successulf, returning the symbol data from database and the evaluated stats infomartions.
+            schema:
+                type: object
+                properties:
+                    timeseries:
+                        type: array
+                        description: The time series of the symbol.
+                    stats:
+                        type: object
+                        description: The stats informations of the stock.
+                        properties:
+                            symbol:
+                                type: string
+                                description: The symbol name.
+                            cumulativeReturn:
+                                type: number
+                                description: The cumulative return of the stock.
+                            annualizedCumulativeReturn:
+                                type: number
+                                description: The annualized cummulative return of the stock.
+                            annualizedVolatility:
+                                type: number
+                                description: The annualized volatility of the stock.
+
+        204:
+            description: Data does not exist in database, you can create it through the POST /symbols
+    """
+    target_data_format: str = request.args.get("dataFormat", default="", type=str)
+    localize: bool = request.args.get("localize", default=False, type=json.loads)
+    performance: bool = request.args.get("performance", default=True, type=json.loads)
+    data = db.session.get(StockTimeSeries, symbol)
+    if data is None:
+        # Data does not exist
+        return {}, 204
+
+    else:
+        result = stock_timeseries_schema.dump(data)
+        stats_table = stock_stats.evaluate_stats_information(
+            result["timeseries"], symbol
+        )
+
+        result["timeseries"] = utils.series_to_apexcharts(
+            result["timeseries"], performance
+        )
+
+        return {"data": result, "stats": stats_table}, 200
+
+
+@app.route("/symbols/<symbol>", methods=["PUT"])
+def update_symbol_data(symbol: str):
+    """Update one specific symbol.
+
+    Update data symbol in the database.
+    ---
+    tags:
+        - SYMBOLS
+    parameters:
+        - in: path
+          name: symbol
+          schema:
+            type: string
+          required: true
+          description: The symbol we want to update data in the database.
+    responses:
+        200:
+            description: The data was successufly updated, you can get it back with get request.
+        204:
+            description: The data does not exists, you should create it first with POST /symbols.
+
+        304:
+            description: The data was not updated because it was fresh enough or the associated market was closed.
+
+        400:
+            description: Time dela is incorrect, choose according to message.
+            schema:
+                type: object
+                properties:
+                    message:
+                        type: string
+                        description: Gives the list of available time delta.
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case.
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error messaeg associated.
+    """
+    max_delta = request.args.get("maxDelta", default="4h", type=str)
+    if max_delta not in DELTA_CHOICES:
+        return {
+            "message": f'Incorect time delta, should be within {", ".join(DELTA_CHOICES)}'
+        }, 400
+
+    old_data = db.session.get(StockTimeSeries, symbol)
+    if old_data is None:
+        # Data does not exist
+        return {}, 204
+
+    else:
+        # Check if data is fresh enough
+        delta_size = int(re.findall("\d+", max_delta)[0])
+        delta_unit = convert_delta_unit[re.findall("\D+", max_delta)[0]]
+
+        time_delta = datetime.datetime.today() - old_data.timeseries.index[-1]
+        if time_delta < datetime.timedelta(**{delta_unit: delta_size}):
+            # Data is fresh enough
+            logger.warning(
+                f"Last data point is younger than {delta_size} {delta_unit}, no new data available."
+            )
+            return {}, 304
 
         else:
-            exchange = result_from_twelve_data["exchange"]
-            time_series = result_from_twelve_data["data"]
+            # Data is not fresh enough, now check if market is open
+            exchange_data = db.session.get(MarketState, old_data.exchange)
 
-            json_stats = stock_stats.evaluate_stats_information(time_series, symbol)
-            stocks_date = list(time_series.index)
-            stock_values = list(time_series.values)
+            if not exchange_data:
+                return {"message": f"No market data for {old_data.exchange}"}, 409
 
-            # POST method
-            if method == "POST":
-                new_timeseries = StockTimeSeries(
-                    symbol, exchange, stocks_date, stock_values
+            if not exchange_data.isMarketOpen:
+                # Market is close
+                logger.warning(f"{old_data.exchange} is closed, no new data avilable.")
+                return {}, 304
+
+            else:
+                result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
+                    symbol, API_KEY
                 )
-                db.session.add(new_timeseries)
-
-                db.session.commit()
-
-            # PUT method
-            elif method == "PUT":
-                old_timeseries = db.session.get(StockTimeSeries, symbol)
-                if (
-                    old_timeseries is None
-                ):  # TODO : unnecessary, should be removed after further testing...
-                    status = "ko"
-                    stocks_date = None
-                    stock_values = None
-                    json_stats = None
-
-                else:
-                    old_timeseries.exchange = exchange
-                    old_timeseries.dateValue = stocks_date
-                    old_timeseries.stockValues = stock_values
-
+                if result_from_twelve_data["status"] == "ok":
+                    old_data.timeseries = result_from_twelve_data["data"]
                     db.session.commit()
 
-    response_formatted_data: List[List[int | float]] = utils.format_sending_data(
-        stocks_date, stock_values
-    )
+                    return {
+                        "message": f"Data succesfully updated, use GET /symbols/{symbol}"
+                    }, 200
 
-    logger.info(f"Function request_data({symbol}) completed !")
-    return json.dumps(
-        {
-            "symbol": symbol,
-            "data": response_formatted_data,
-            "stats": json_stats,
-            "status": status,
-        }
-    )
+                else:
+                    return result_from_twelve_data, 500
+
+
+@app.route("/market", methods=["GET"])
+def get_market_state():
+    """Get the market informations.
+
+    Get the market state data.
+    ---
+    tags:
+        - MARKET
+    responses:
+        200:
+            description: Request succesful, returning market data
+            schema:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        exchange:
+                            type: string
+                            description: The market exchange name.
+
+                        country:
+                            type: string
+                            description: The country of the market.
+
+                        isMarketOpen:
+                            type: boolean
+                            description: Indicates if the market is open.
+
+                        timeToOpen:
+                            type: integer
+                            description: If the market is close, indicates the time before opening (timestamp duration).
+
+                        timeToClose:
+                            type: integer
+                            description: If the market is open, indicates the time before close (timestamp duration).
+
+                        dateCheck:
+                            type: number
+                            description: Indicates the timestamp when the market check was made.
+
+
+    """
+    data = MarketState.query.all()
+
+    market: Dict[str, str | List[List[float | int]]] = markets_schema.dump(data)
+    market = pd.DataFrame(market)
+
+    market = [json.loads(x.to_json()) for x in market.iloc]
+
+    return market, 200
+
+
+@app.route("/market", methods=["POST"])
+def create_market_state():
+    """Create the market informations.
+
+    Create the market state in database.
+    ---
+    tags:
+        - MARKET
+    responses:
+        200:
+            description: The data already exists, you can get it with GET /market.
+        201:
+            description: The data was succesfuly created, you can get it with GET /market.
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+
+    """
+    data = MarketState.query.all()
+    if data:
+        # Data already exists
+
+        return {"message": f"Data already exists, use GET /market"}, 200
+
+    else:
+        result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
+        if result_from_twelve_data["status"] == "ok":
+            data_market = result_from_twelve_data["data"]
+            for data_exchange in data_market.iloc:
+                # Adding each market one by one
+
+                db.session.add(
+                    MarketState(
+                        exchange=data_exchange["exchange"],
+                        country=data_exchange["country"],
+                        isMarketOpen=data_exchange["isMarketOpen"],
+                        timeToOpen=data_exchange["timeToOpen"],
+                        timeToClose=data_exchange["timeToClose"],
+                        dateCheck=datetime.datetime.now().timestamp(),
+                    )
+                )
+
+            db.session.commit()
+
+        else:
+            # Error
+            return result_from_twelve_data, 500
+
+    return {"message": f"Data succesfully created, use GET /market"}, 201
+
+
+@app.route("/market", methods=["PUT"])
+def update_market_state():
+    """Update the market informations.
+
+    Update the market data.
+    ---
+    tags:
+        - MARKET
+    responses:
+        200:
+            description: The data was succesfuly updated, you can get it with GET /market.
+
+        204:
+            description: The data does not exist in database, you can create it with POST /market.
+
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case.
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+    """
+    data = MarketState.query.all()
+    if not data:
+        # Data does not exist
+        return {}, 204
+
+    else:
+        result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
+        if result_from_twelve_data["status"] == "ok":
+            data_market = result_from_twelve_data["data"]
+            for data_exchange in data_market.iloc:
+                old_exchange_data = db.session.get(
+                    MarketState, data_exchange["exchange"]
+                )
+                if old_exchange_data is None:
+                    # TODO : adding new data to database through PUT request... Ugly...
+                    # No data for this exchange, lets add it to the database
+                    db.session.add(
+                        MarketState(
+                            exchange=data_exchange["exchange"],
+                            country=data_exchange["country"],
+                            isMarketOpen=data_exchange["isMarketOpen"],
+                            timeToOpen=data_exchange["timeToOpen"],
+                            timeToClose=data_exchange["timeToClose"],
+                            dateCheck=datetime.datetime.now().timestamp(),
+                        )
+                    )
+
+                else:
+                    old_exchange_data.isMarketOpen = data_exchange["isMarketOpen"]
+                    old_exchange_data.timeToOpen = data_exchange["timeToOpen"]
+                    old_exchange_data.timeToClose = data_exchange["timeToClose"]
+                    old_exchange_data.dateCheck = datetime.datetime.now().timestamp()
+
+            db.session.commit()
+
+        else:
+            # Error
+            return result_from_twelve_data, 500
+
+    return {"message": f"Data succesfully updated, use GET /market"}, 200
+
+
+@app.route("/spec")
+def spec():
+    swag = swagger(app)
+    swag["info"]["version"] = "1.0"
+    swag["info"]["title"] = "Full Stocks backend"
+
+    return json.dumps(swag)
 
 
 # Start the app
 if __name__ == "__main__":
     # Production server
 
+    SWAGGER_URL = "/api/docs"
+    API_URL = "/spec"
+    swaggerui_blueprint = get_swaggerui_blueprint(SWAGGER_URL, API_URL)
+
     from waitress import serve
+
+    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     serve(app, host="0.0.0.0", port=5000)
