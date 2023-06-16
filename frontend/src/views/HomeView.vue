@@ -2,7 +2,7 @@
   <div class="home">
     <MarketState :marketData="marketData" :doUpdateMarket="doUpdateMarket" @updateMarket="updateMarketData()"/>
     <div class="symboldata">
-      <button @click='performance = !performance'>Performance</button>
+      <!-- <button @click='performance = !performance'>Performance</button> -->
       <LineChart :dataLineChart="dataLineChart" />
       <StatsTable :tableData="dataStatsTable"/>
     </div>
