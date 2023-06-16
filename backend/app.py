@@ -453,7 +453,7 @@ def update_symbol_data(symbol: str):
                         type: string
                         description: The error messaeg associated.
     """
-    max_delta = request.args.get("maxDelta", default="4h", type=str)
+    max_delta = request.args.get("maxDelta", default="1day", type=str)
     if max_delta not in DELTA_CHOICES:
         return {
             "message": f'Incorrect time delta, should be within {", ".join(DELTA_CHOICES)}'
