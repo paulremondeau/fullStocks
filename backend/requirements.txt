@@ -4,6 +4,8 @@ typeguard
 requests
 flask
 flask_cors
+flask-swagger
+flask-swagger-ui
 pandas
 python-dateutil
 waitress

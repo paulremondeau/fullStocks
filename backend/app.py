@@ -53,11 +53,13 @@ import logging.config
 
 import pandas as pd
 
-from flask import Flask, request, jsonify, redirect
+
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.exc import IntegrityError
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
+from flask_swagger import swagger
+from flask_swagger_ui import get_swaggerui_blueprint
 
 from src import request_twelvedata_api, stock_stats, utils
 
@@ -70,7 +72,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # =================================================================================================
 
 
-logging.config.fileConfig(LOG_CONFIG_FILE)
+logging.config.fileConfig(os.path.join(basedir, LOG_CONFIG_FILE))
 logger = logging.getLogger(__logger__)
 logger.info("Logger initialized.")
 
@@ -173,12 +175,58 @@ logger.info("Database initialized.")
 #     Routes
 # =================================================================================================
 
-# TODO : make swagger doc for sphinx
-# TODO : instead of redirect, maybe respond the code and client will decide what to do ?
-
 
 @app.route("/symbols", methods=["GET"])
 def get_all_symbols_data():
+    """Get all symbols at once.
+
+    Get the list of all the symbols data available in database.
+    ---
+    tags:
+        - SYMBOLS
+    responses:
+        200:
+            description: Request successulf, returning all symbols data from database and the evaluated stats infomartions.
+            schema:
+                type: object
+                properties:
+                    timeseries:
+                        type: array
+                        description: The symbols timeseries.
+                        items:
+                            type: array
+                            description: One symbol timeseries.
+                            items:
+                                type: array
+                                items:
+                                    type: number
+                                    description: A data point (time and value).
+                                minItems: 2
+                                maxItems: 2
+
+                    stats:
+                        type: array
+                        description: The list of the stats informations of the stocks.
+                        items:
+                            type: object
+                            properties:
+                                symbol:
+                                    type: string
+                                    description: The symbol name.
+                                cumulativeReturn:
+                                    type: number
+                                    description: The cumulative return of the stock.
+                                annualizedCumulativeReturn:
+                                    type: number
+                                    description: The annualized cummulative return of the stock.
+                                annualizedVolatility:
+                                    type: number
+                                    description: The annualized volatility of the stock.
+
+
+
+
+    """
     target_data_format: str = request.args.get(
         "dataFormat", default="apexcharts", type=str
     )
@@ -191,25 +239,78 @@ def get_all_symbols_data():
         str, str | List[List[float | int]]
     ] = stocks_timeseries_schema.dump(data)
 
+    stats_table = [
+        stock_stats.evaluate_stats_information(entry["timeseries"], entry["symbol"])
+        for entry in all_timeseries
+    ]
+
     for entry in all_timeseries:
         entry["timeseries"] = utils.series_to_apexcharts(
             entry["timeseries"], performance
         )
 
-    return all_timeseries, 200
+    return {"timeseries": all_timeseries, "stats": stats_table}, 200
 
 
 @app.route("/symbols", methods=["POST"])
 def create_symbol_data():
+    """Add a new symbol.
+
+    Add a symbol timeseries to the database.
+    ---
+    tags:
+        - SYMBOLS
+
+    requestBody:
+        description: The parameter of the request.
+        required: true
+        schema:
+            type: object
+            properties:
+                symbol:
+                    type: string
+                    description: The symbol we want to add to the database.
+
+    parameters:
+        - name: body
+          in: body
+          requiered: true
+          schema:
+            type: object
+            properties:
+                symbol:
+                    type: string
+                    description: The symbol we want to add to the database.
+
+    responses:
+        200:
+            description: Data already exists in the database, you can use directly the get method.
+        201:
+            description: Data succesfuly created in the database, you can use the get method to retrieve it.
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+    """
     requests_body = json.loads(request.data)
 
     symbol = requests_body["symbol"]
 
     if db.session.get(StockTimeSeries, symbol) is not None:
         # Data already exist
-        return {"message": f"Data alrady exists, use GET /symbols/{symbol}"}, 200
+        return {"message": f"Data already exists, use GET /symbols/{symbol}"}, 200
 
-        # return {"message": f"Data alrady exists, use /symbols/{symbol}"}, 409
+        # return {"message": f"Data already exists, use /symbols/{symbol}"}, 409
 
     else:
         # Data does not exists
@@ -235,6 +336,48 @@ def create_symbol_data():
 
 @app.route("/symbols/<symbol>", methods=["GET"])
 def get_symbol_data(symbol: str):
+    """Retrieve one specific symbol.
+
+    Get timeseries and statistics informations of the given stock symbol.
+    ---
+    tags:
+        - SYMBOLS
+    parameters:
+        - in: path
+          name: symbol
+          schema:
+            type: string
+          required: true
+          description: The symbol we want to retrieve data from the database.
+    responses:
+        200:
+            description: Request successulf, returning the symbol data from database and the evaluated stats infomartions.
+            schema:
+                type: object
+                properties:
+                    timeseries:
+                        type: array
+                        description: The time series of the symbol.
+                    stats:
+                        type: object
+                        description: The stats informations of the stock.
+                        properties:
+                            symbol:
+                                type: string
+                                description: The symbol name.
+                            cumulativeReturn:
+                                type: number
+                                description: The cumulative return of the stock.
+                            annualizedCumulativeReturn:
+                                type: number
+                                description: The annualized cummulative return of the stock.
+                            annualizedVolatility:
+                                type: number
+                                description: The annualized volatility of the stock.
+
+        204:
+            description: Data does not exist in database, you can create it through the POST /symbols
+    """
     target_data_format: str = request.args.get("dataFormat", default="", type=str)
     localize: bool = request.args.get("localize", default=False, type=json.loads)
     performance: bool = request.args.get("performance", default=True, type=json.loads)
@@ -258,6 +401,51 @@ def get_symbol_data(symbol: str):
 
 @app.route("/symbols/<symbol>", methods=["PUT"])
 def update_symbol_data(symbol: str):
+    """Update one specific symbol.
+
+    Update data symbol in the database.
+    ---
+    tags:
+        - SYMBOLS
+    parameters:
+        - in: path
+          name: symbol
+          schema:
+            type: string
+          required: true
+          description: The symbol we want to update data in the database.
+    responses:
+        200:
+            description: The data was successufly updated, you can get it back with get request.
+        204:
+            description: The data does not exists, you should create it first with POST /symbols.
+
+        304:
+            description: The data was not updated because it was fresh enough or the associated market was closed.
+
+        400:
+            description: Time dela is incorrect, choose according to message.
+            schema:
+                type: object
+                properties:
+                    message:
+                        type: string
+                        description: Gives the list of available time delta.
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case.
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error messaeg associated.
+    """
     max_delta = request.args.get("maxDelta", default="4h", type=str)
     if max_delta not in DELTA_CHOICES:
         return {
@@ -280,9 +468,7 @@ def update_symbol_data(symbol: str):
             logger.warning(
                 f"Last data point is younger than {delta_size} {delta_unit}, no new data available."
             )
-            return {
-                "message": f"Last data point is younger than {delta_size} {delta_unit}, no new data available."
-            }, 304
+            return {}, 304
 
         else:
             # Data is not fresh enough, now check if market is open
@@ -294,9 +480,7 @@ def update_symbol_data(symbol: str):
             if not exchange_data.isMarketOpen:
                 # Market is close
                 logger.warning(f"{old_data.exchange} is closed, no new data avilable.")
-                return {
-                    "message": f"{old_data.exchange} is closed, no new data avilable."
-                }, 304
+                return {}, 304
 
             else:
                 result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
@@ -316,6 +500,46 @@ def update_symbol_data(symbol: str):
 
 @app.route("/market", methods=["GET"])
 def get_market_state():
+    """Get the market informations.
+
+    Get the market state data.
+    ---
+    tags:
+        - MARKET
+    responses:
+        200:
+            description: Request succesful, returning market data
+            schema:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        exchange:
+                            type: string
+                            description: The market exchange name.
+
+                        country:
+                            type: string
+                            description: The country of the market.
+
+                        isMarketOpen:
+                            type: boolean
+                            description: Indicates if the market is open.
+
+                        timeToOpen:
+                            type: integer
+                            description: If the market is close, indicates the time before opening (timestamp duration).
+
+                        timeToClose:
+                            type: integer
+                            description: If the market is open, indicates the time before close (timestamp duration).
+
+                        dateCheck:
+                            type: number
+                            description: Indicates the timestamp when the market check was made.
+
+
+    """
     data = MarketState.query.all()
 
     market: Dict[str, str | List[List[float | int]]] = markets_schema.dump(data)
@@ -328,11 +552,38 @@ def get_market_state():
 
 @app.route("/market", methods=["POST"])
 def create_market_state():
+    """Create the market informations.
+
+    Create the market state in database.
+    ---
+    tags:
+        - MARKET
+    responses:
+        200:
+            description: The data already exists, you can get it with GET /market.
+        201:
+            description: The data was succesfuly created, you can get it with GET /market.
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+
+    """
     data = MarketState.query.all()
     if data:
         # Data already exists
 
-        return {"message": f"Data alrady exists, use GET /market"}, 200
+        return {"message": f"Data already exists, use GET /market"}, 200
 
     else:
         result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
@@ -363,6 +614,34 @@ def create_market_state():
 
 @app.route("/market", methods=["PUT"])
 def update_market_state():
+    """Update the market informations.
+
+    Update the market data.
+    ---
+    tags:
+        - MARKET
+    responses:
+        200:
+            description: The data was succesfuly updated, you can get it with GET /market.
+
+        204:
+            description: The data does not exist in database, you can create it with POST /market.
+
+        500:
+            description: An error occured.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case.
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+    """
     data = MarketState.query.all()
     if not data:
         # Data does not exist
@@ -405,10 +684,25 @@ def update_market_state():
     return {"message": f"Data succesfully updated, use GET /market"}, 200
 
 
+@app.route("/spec")
+def spec():
+    swag = swagger(app)
+    swag["info"]["version"] = "1.0"
+    swag["info"]["title"] = "Full Stocks backend"
+
+    return json.dumps(swag)
+
+
 # Start the app
 if __name__ == "__main__":
     # Production server
 
+    SWAGGER_URL = "/api/docs"
+    API_URL = "/spec"
+    swaggerui_blueprint = get_swaggerui_blueprint(SWAGGER_URL, API_URL)
+
     from waitress import serve
+
+    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     serve(app, host="0.0.0.0", port=5000)

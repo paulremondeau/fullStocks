@@ -6,9 +6,12 @@ This documentation is about the backend of the application, running in Python.
 To see the application live, follow https://fullstocks.onrender.com/
 
 
+
 .. toctree::
    :maxdepth: 1
    :caption: Functions
+
+   app
 
    stock_stats
    request_twelvedata_api

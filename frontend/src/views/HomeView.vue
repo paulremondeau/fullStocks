@@ -2,6 +2,7 @@
   <div class="home">
     <MarketState :marketData="marketData" :doUpdateMarket="doUpdateMarket" @updateMarket="updateMarketData()"/>
     <div class="symboldata">
+      <button @click='performance = !performance'>Performance</button>
       <LineChart :dataLineChart="dataLineChart" />
       <StatsTable :tableData="dataStatsTable"/>
     </div>
@@ -9,7 +10,8 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, createApp } from 'vue'
+
+import { reactive, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 
 import LineChart from '../components/LineChart.vue'
@@ -157,9 +159,7 @@ function getMarketState() {
 async function initializeTimeSeries() {
 
   for (let symbol of selectedSymbols){
-    console.log(symbol)
     let symbolData = await updateTimeSeries(symbol)
-    console.log(symbolData)
     processApiResult(symbolData)
   }
 
@@ -227,7 +227,7 @@ function createTimeSeries(symbol) {
 function getTimeSeries(symbol) {
 
   return axios
-  .get(apiUrl + "symbols/" + symbol)
+  .get(apiUrl + "symbols/" + symbol + "?performance=" + performance.value.toString())
   .then((res) => {
 
     // No data found
@@ -246,7 +246,15 @@ function getTimeSeries(symbol) {
 
 }
 
-
+// Complete to update data
+// watch(performance, async () => {
+//   Object.assign(marketData, [])
+//   for (let symbol of selectedSymbols){
+//     console.log(symbol)
+//     let data = await getTimeSeries(symbol)
+  
+//   }
+// })
 
 
 /**
