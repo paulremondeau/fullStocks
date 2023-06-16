@@ -62,7 +62,7 @@ function updateTimerMarket(){
                 let indexData = props.marketData.indexOf(exchangeData)
                 if (exchangeData.isMarketOpen) {     
                     exchangeData.timeToClose -= 1000;
-                    if (exchangeData.timeToClose <= 0){
+                    if (exchangeData.timeToClose <= 0.99){
                         
                         // This will trigger the emit and stop the updating
                         props.doUpdateMarket[0] = true
@@ -72,7 +72,7 @@ function updateTimerMarket(){
                     }
                 } else {
                     exchangeData.timeToOpen -= 1000;
-                    if (exchangeData.timeToOpen <= 0){
+                    if (exchangeData.timeToOpen <= 0.99){
                         
                         // This will trigger the emit and stop the updating
                         props.doUpdateMarket[0] = true

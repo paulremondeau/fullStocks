@@ -21,7 +21,7 @@ describe('MarketState', () => {
                 props:
                 {
                     marketData: [],
-                    updateMarket: [false]
+                    doUpdateMarket: [false]
                 }
             }
         )
@@ -34,7 +34,7 @@ describe('MarketState', () => {
                 props:
                 {
                     marketData: [{ "exchange": "NASDAQ", "isMarketOpen": true, "timeToClose": 224000 }],
-                    updateMarket: [false]
+                    doUpdateMarket: [false]
                 }
             }
         )
@@ -52,7 +52,7 @@ describe('MarketState', () => {
                         { "exchange": "NASDAQ", "isMarketOpen": true, "timeToClose": 224000, "timeToOpen": 1651651065 },
                         { "exchange": "Munich", "isMarketOpen": false, "timeToClose": 11606523065, "timeToOpen": 1450000 }
                     ],
-                    updateMarket: [false]
+                    doUpdateMarket: [false]
                 }
             }
         )
@@ -75,7 +75,7 @@ describe('MarketState', () => {
                         { "exchange": "NASDAQ", "isMarketOpen": true, "timeToClose": 1000, "timeToOpen": 1000 },
                         { "exchange": "Munich", "isMarketOpen": false, "timeToClose": 1000, "timeToOpen": 1000 }
                     ],
-                    updateMarket: [false]
+                    doUpdateMarket: [false]
                 }
             }
         )
