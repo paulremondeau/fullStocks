@@ -55,7 +55,7 @@ def test_series_to_apexcharts():
     ]
     stock_time_series = [3, 1, 2]
     timeseries = pd.Series(stock_time_series, index=stock_dates)
-    assert series_to_apexcharts(timeseries) == [
+    assert series_to_apexcharts(timeseries, performance=True) == [
         [1, 100.0],
         [2, 33.33],
         [3, 66.67],

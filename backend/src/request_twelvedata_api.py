@@ -40,6 +40,7 @@ twelvedata_api_config_path = os.path.join(
 
 twelvedata_api_config = read_twelvedata_api_config_file(twelvedata_api_config_path)
 
+
 # =================================================================================================
 #     Functions
 # =================================================================================================

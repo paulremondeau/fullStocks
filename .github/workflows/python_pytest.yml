@@ -1,6 +1,6 @@
 # This workflow will run Python unit test with pytest.
 
-name: Python Unit Tests 
+name: Python Pytest
 
 on:
   push:

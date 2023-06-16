@@ -37,9 +37,9 @@ class TwelveDataApiException(Exception):
     Examples
     ----------
     >>> try:
-    >>>     raise TwelveDataApiException(500, "Erreur")
-    >>> except TwelveDataApiException as e:
-    >>>     print(e.code, e.message)
+    ...     raise TwelveDataApiException(500, "Erreur")
+    ... except TwelveDataApiException as e:
+    ...     print(e.code, e.message)
     500 Erreur
 
     """
@@ -64,21 +64,23 @@ def handle_exception(func):
     Let's define a simple function that raise TwelveDataApiException if its argument is True :
 
     >>> @handle_exception
-    >>> def foo(raise_exception: bool):
-    >>>     if raise_exception:
-    >>>         raise TwelveDataApiException(500, "Erreur")
-    >>>     else:
-    >>>         return "Nothing hapenned"
+    ... def foo(raise_exception: bool):
+    ...     if raise_exception:
+    ...         raise TwelveDataApiException(500, "Erreur")
+    ...     else:
+    ...         return "Nothing hapenned"
+    >>> foo(raise_exception=True)
+    {'status': 'error', 'code': 500, 'message': 'Erreur'}
+    >>> foo(raise_exception=False)
+    'Nothing hapenned'
 
     Now, let's raise the exception from foo() :
 
-    >>> foo(raise_exception=True)
-    {"status": "error", "code": 500, "message": "Erreur"}
+
 
     Finally, let's see what happens when no exception is raised :
 
-    >>> foo(raise_exception=False)
-    Nothing hapenned
+
     """
 
     @functools.wraps(func)
