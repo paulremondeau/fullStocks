@@ -327,7 +327,7 @@ def test_get_markets_state(requests_mock):
 
     # endregion
 
-    # region Should handle whenn data keys are not the expected ones
+    # region Should handle when data keys are not the expected ones
 
     data = [{"key1": "ok"}, {"key1": "ok"}]
 
@@ -345,7 +345,7 @@ def test_get_markets_state(requests_mock):
 
     # endregion
 
-    # region Sould correctly convert data from Twelve Data API
+    # region Should correctly convert data from Twelve Data API
 
     data = [
         {

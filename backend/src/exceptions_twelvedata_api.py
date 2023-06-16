@@ -68,11 +68,11 @@ def handle_exception(func):
     ...     if raise_exception:
     ...         raise TwelveDataApiException(500, "Erreur")
     ...     else:
-    ...         return "Nothing hapenned"
+    ...         return "Nothing happened"
     >>> foo(raise_exception=True)
     {'status': 'error', 'code': 500, 'message': 'Erreur'}
     >>> foo(raise_exception=False)
-    'Nothing hapenned'
+    'Nothing happened'
 
     Now, let's raise the exception from foo() :
 

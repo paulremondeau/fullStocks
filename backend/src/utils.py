@@ -30,7 +30,7 @@ import pandas as pd
 
 # TODO : doctest is ugly...
 def read_twelvedata_api_config_file(file_path: str):
-    """Custome loading of twelvedata pi config file.
+    """Custom loading of twelvedata pi config file.
 
     This transforms list values whom keys end with '_keys'
     to set.

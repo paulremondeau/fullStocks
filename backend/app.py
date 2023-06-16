@@ -186,7 +186,7 @@ def get_all_symbols_data():
         - SYMBOLS
     responses:
         200:
-            description: Request successulf, returning all symbols data from database and the evaluated stats infomartions.
+            description: Request successful, returning all symbols data from database and the evaluated stats infomartions.
             schema:
                 type: object
                 properties:
@@ -218,7 +218,7 @@ def get_all_symbols_data():
                                     description: The cumulative return of the stock.
                                 annualizedCumulativeReturn:
                                     type: number
-                                    description: The annualized cummulative return of the stock.
+                                    description: The annualized cumulative return of the stock.
                                 annualizedVolatility:
                                     type: number
                                     description: The annualized volatility of the stock.
@@ -274,7 +274,7 @@ def create_symbol_data():
     parameters:
         - name: body
           in: body
-          requiered: true
+          required: true
           schema:
             type: object
             properties:
@@ -286,9 +286,9 @@ def create_symbol_data():
         200:
             description: Data already exists in the database, you can use directly the get method.
         201:
-            description: Data succesfuly created in the database, you can use the get method to retrieve it.
+            description: Data successfully created in the database, you can use the get method to retrieve it.
         500:
-            description: An error occured.
+            description: An error happened sever-side.
             schema:
                 type: object
                 properties:
@@ -351,13 +351,20 @@ def get_symbol_data(symbol: str):
           description: The symbol we want to retrieve data from the database.
     responses:
         200:
-            description: Request successulf, returning the symbol data from database and the evaluated stats infomartions.
+            description: Request successful, returning the symbol data from database and the evaluated stats infomartions.
             schema:
                 type: object
                 properties:
                     timeseries:
                         type: array
-                        description: The time series of the symbol.
+                        description: One symbol timeseries.
+                        items:
+                            type: array
+                            items:
+                                type: number
+                                description: A data point (time and value).
+                            minItems: 2
+                            maxItems: 2
                     stats:
                         type: object
                         description: The stats informations of the stock.
@@ -370,7 +377,7 @@ def get_symbol_data(symbol: str):
                                 description: The cumulative return of the stock.
                             annualizedCumulativeReturn:
                                 type: number
-                                description: The annualized cummulative return of the stock.
+                                description: The annualized cumulative return of the stock.
                             annualizedVolatility:
                                 type: number
                                 description: The annualized volatility of the stock.
@@ -416,7 +423,7 @@ def update_symbol_data(symbol: str):
           description: The symbol we want to update data in the database.
     responses:
         200:
-            description: The data was successufly updated, you can get it back with get request.
+            description: The data was successfully updated, you can get it back with get request.
         204:
             description: The data does not exists, you should create it first with POST /symbols.
 
@@ -424,7 +431,7 @@ def update_symbol_data(symbol: str):
             description: The data was not updated because it was fresh enough or the associated market was closed.
 
         400:
-            description: Time dela is incorrect, choose according to message.
+            description: Time delta is incorrect, choose according to message.
             schema:
                 type: object
                 properties:
@@ -432,7 +439,7 @@ def update_symbol_data(symbol: str):
                         type: string
                         description: Gives the list of available time delta.
         500:
-            description: An error occured.
+            description: An error happened server-side.
             schema:
                 type: object
                 properties:
@@ -449,7 +456,7 @@ def update_symbol_data(symbol: str):
     max_delta = request.args.get("maxDelta", default="4h", type=str)
     if max_delta not in DELTA_CHOICES:
         return {
-            "message": f'Incorect time delta, should be within {", ".join(DELTA_CHOICES)}'
+            "message": f'Incorrect time delta, should be within {", ".join(DELTA_CHOICES)}'
         }, 400
 
     old_data = db.session.get(StockTimeSeries, symbol)
@@ -479,7 +486,7 @@ def update_symbol_data(symbol: str):
 
             if not exchange_data.isMarketOpen:
                 # Market is close
-                logger.warning(f"{old_data.exchange} is closed, no new data avilable.")
+                logger.warning(f"{old_data.exchange} is closed, no new data available.")
                 return {}, 304
 
             else:
@@ -491,7 +498,7 @@ def update_symbol_data(symbol: str):
                     db.session.commit()
 
                     return {
-                        "message": f"Data succesfully updated, use GET /symbols/{symbol}"
+                        "message": f"Data successfully updated, use GET /symbols/{symbol}"
                     }, 200
 
                 else:
@@ -508,7 +515,7 @@ def get_market_state():
         - MARKET
     responses:
         200:
-            description: Request succesful, returning market data
+            description: Request successful, returning market data
             schema:
                 type: array
                 items:
@@ -562,9 +569,9 @@ def create_market_state():
         200:
             description: The data already exists, you can get it with GET /market.
         201:
-            description: The data was succesfuly created, you can get it with GET /market.
+            description: The data was successfully created, you can get it with GET /market.
         500:
-            description: An error occured.
+            description: An error happened server-side.
             schema:
                 type: object
                 properties:
@@ -622,13 +629,13 @@ def update_market_state():
         - MARKET
     responses:
         200:
-            description: The data was succesfuly updated, you can get it with GET /market.
+            description: The data was successfully updated, you can get it with GET /market.
 
         204:
             description: The data does not exist in database, you can create it with POST /market.
 
         500:
-            description: An error occured.
+            description: An error happened server-side.
             schema:
                 type: object
                 properties:
@@ -681,7 +688,7 @@ def update_market_state():
             # Error
             return result_from_twelve_data, 500
 
-    return {"message": f"Data succesfully updated, use GET /market"}, 200
+    return {"message": f"Data successfully updated, use GET /market"}, 200
 
 
 @app.route("/spec")

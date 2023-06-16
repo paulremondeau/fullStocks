@@ -81,7 +81,7 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
     >>> check_twelvedata_api_response(requests.get("http://api.twelvedata.com/badRessource"))
     {"status": "error",  "code": 404, "message": "Not found"}
 
-    If an error occured from Twelve Data API :
+    If an error happened server-side from Twelve Data API :
 
     >>> check_twelvedata_api_response(requests.get("http://api.twelvedata.com/badRessource"))
     {"status": "error",  "code": 429, "message": "You have run out of API credits for the current minute."}
@@ -100,7 +100,7 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
         raise TwelveDataApiException(404, "Not found")
 
     elif status_code_requests == 200:
-        # Request succedeed
+        # Request succeeded
         response_json = response.json()
         if isinstance(response_json, list):
             # This is for the market data
@@ -111,7 +111,7 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
             status = response_json["status"]
 
         if status == "error":
-            # An error occured with Twelve Data API
+            # An error happened with Twelve Data API
             code = response_json["code"]
             message = response_json["message"]
 
@@ -121,7 +121,7 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
             return response_json
 
     else:
-        # Statut code non géré
+        # Unhandled status code
         raise TwelveDataApiException(501, "Not implemented")
 
 
@@ -202,7 +202,7 @@ def get_stock_timeseries(
     ), "Meta data are not correct, check Twelve Data API"
 
     exchange = meta["exchange"]
-    timzezone = meta["exchange_timezone"]
+    timezone = meta["exchange_timezone"]
 
     values = response_json["values"]
     # Check if values is not an empty list
@@ -237,7 +237,7 @@ def get_stock_timeseries(
     return {
         "status": "ok",
         "exchange": exchange,
-        "timezone": timzezone,
+        "timezone": timezone,
         "data": working_df,
     }
 
@@ -248,13 +248,13 @@ def get_markets_state(api_key: str) -> Dict[str, str | int | pd.DataFrame]:
 
     If request fails (not enough token), status is "ko"
     and df is None.
-    If request succeds, status is "ok" and df contains the dataframe
+    If request succeeds, status is "ok" and df contains the dataframe
     with columns name, country, is_market_open, time_to_open, time_to_close, time_after_open, date_check.
 
     Parameters
     ----------
     api_key : str
-        API key for the Tweleve Data API.
+        API key for the Twelve Data API.
 
     Returns
     -------
