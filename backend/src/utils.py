@@ -121,9 +121,9 @@ def series_to_apexcharts(
     ... ]
     >>> timeseries = pd.Series(values, index = dates)
     >>> series_to_apexcharts(timeseries, performance = False)
-    # [[1, 3], [2,1], [3, 2]]
-    # >>> series_to_apexcharts(stock_time_series, stock_dates, performance = True)
-    # [[1, 100.0], [2, 33.33], [3, 66.67]]
+    [[1672531200000, 3.0], [1672704000000, 1.0], [1672617600000, 2.0]]
+    >>> series_to_apexcharts(timeseries, performance = True)
+    [[1672531200000, 100.0], [1672704000000, 33.33], [1672617600000, 66.67]]
     """
 
     if timeseries is None:
