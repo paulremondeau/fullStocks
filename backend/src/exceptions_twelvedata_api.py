@@ -72,7 +72,7 @@ def handle_exception(func):
     >>> foo(raise_exception=True)
     {'status': 'error', 'code': 500, 'message': 'Erreur'}
     >>> foo(raise_exception=False)
-    'Nothing hapenned'
+    'Nothing hapenned '
 
     Now, let's raise the exception from foo() :
 
