@@ -1,19 +1,30 @@
+
+<template>
+  <apexchart type="line" height="700" width="1200" :options="data.chartOptions" :series="data.series">
+  </apexchart>
+</template>
+
+
+
 <script setup>
 import { reactive, computed, watch } from 'vue'
 
+
 ///// Props /////
 const props = defineProps({
-  dataLineChart: Object
+  dataLineChart: Object,
 })
 
-///// States /////
+
 // Needed to make the chart reactive to option change
 const minimum = computed(() => {
-        return props.dataLineChart.length == 0 ? 0 : props.dataLineChart[Object.keys(props.dataLineChart)[0]].data[0][0]
+  return data.series.length == 0 ? 0 : data.series[Object.keys(data.series)[0]].data[0][0]
 })
 
+const title = computed(() => props.title)
+
 const data = reactive({
-  series: props.dataLineChart,
+  series: computed(() => props.dataLineChart),
   chartOptions: {
     chart: {
       type: 'line',
@@ -29,10 +40,6 @@ const data = reactive({
     stroke: {
       curve: 'straight'
     },
-    title: {
-      text: 'Stocks performances',
-      align: 'center'
-    },
     grid: {
       row: {
         colors: ['#f3f3f3', 'transparent'], // takes an array which will be repeated on columns
@@ -41,7 +48,7 @@ const data = reactive({
     },
     xaxis: {
       type: 'datetime',
-      min : minimum,
+      min: minimum,
       tickAmount: 6
     }
   }
@@ -49,17 +56,8 @@ const data = reactive({
 
 // Make the chart rerender when data minimum changes
 watch(minimum, () => {
-   data.chartOptions = {...data.chartOptions}
+  data.chartOptions = { ...data.chartOptions }
 })
 
-</script>
 
-<template>
-  <apexchart
-    type="line"
-    height="700"
-    width="1200"
-    :options="data.chartOptions"
-    :series="data.series"
-  ></apexchart>
-</template>
+</script>
