@@ -20,6 +20,7 @@ __logger__ = "utils.py"
 
 import json
 from typing import List
+from copy import deepcopy
 
 import pandas as pd
 
@@ -125,6 +126,8 @@ def series_to_apexcharts(
     >>> series_to_apexcharts(timeseries, performance = True)
     [[1672531200000, 100.0], [1672704000000, 33.33], [1672617600000, 66.67]]
     """
+    # print(timeseries)
+    result = deepcopy(timeseries)
 
     if timeseries is None:
         result = []
@@ -134,12 +137,12 @@ def series_to_apexcharts(
             [
                 int(index.timestamp() * 1000),
                 (
-                    float(f"{value / timeseries[0] * 100:.2f}")
+                    float(f"{value / result[0] * 100:.2f}")
                     if performance
                     else float(f"{value:.2f}")
                 ),
             ]
-            for index, value in timeseries.items()
+            for index, value in result.items()
         ]
 
     return result

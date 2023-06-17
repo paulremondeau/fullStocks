@@ -356,15 +356,29 @@ def get_symbol_data(symbol: str):
                 type: object
                 properties:
                     timeseries:
-                        type: array
-                        description: One symbol timeseries.
-                        items:
-                            type: array
-                            items:
-                                type: number
-                                description: A data point (time and value).
-                            minItems: 2
-                            maxItems: 2
+                        type: object
+                        description: Performance and value timeseries.
+                        properties:
+                            performance:
+                                type: array
+                                description: Performance timeseries.
+                                items:
+                                    type: array
+                                    items:
+                                        type: number
+                                        description: A data point (time and value).
+                                    minItems: 2
+                                    maxItems: 2
+                            values:
+                                type: array
+                                description: Value timeseries.
+                                items:
+                                    type: array
+                                    items:
+                                        type: number
+                                        description: A data point (time and value).
+                                    minItems: 2
+                                    maxItems: 2
                     stats:
                         type: object
                         description: The stats informations of the stock.
@@ -387,23 +401,30 @@ def get_symbol_data(symbol: str):
     """
     target_data_format: str = request.args.get("dataFormat", default="", type=str)
     localize: bool = request.args.get("localize", default=False, type=json.loads)
-    performance: bool = request.args.get("performance", default=True, type=json.loads)
+
     data = db.session.get(StockTimeSeries, symbol)
     if data is None:
         # Data does not exist
         return {}, 204
 
     else:
-        result = stock_timeseries_schema.dump(data)
+        database_data = stock_timeseries_schema.dump(data)
+
+        data_result = dict()
+
         stats_table = stock_stats.evaluate_stats_information(
-            result["timeseries"], symbol
+            database_data["timeseries"], symbol
         )
 
-        result["timeseries"] = utils.series_to_apexcharts(
-            result["timeseries"], performance
+        data_result["performance"] = utils.series_to_apexcharts(
+            database_data["timeseries"], performance=True
         )
 
-        return {"data": result, "stats": stats_table}, 200
+        data_result["values"] = utils.series_to_apexcharts(
+            database_data["timeseries"], performance=False
+        )
+
+        return {"timeseries": data_result, "stats": stats_table}, 200
 
 
 @app.route("/symbols/<symbol>", methods=["PUT"])
