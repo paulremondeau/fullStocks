@@ -1,7 +1,9 @@
+/**
+ * Offset market timers inplace.
+ * @param {Object} data The market data.
+ * @param {Integer} offSet The offset to add.
+ */
 function offSetMarketTime(data, offSet) {
-
-    let result = []
-
 
     for (let market of data) {
 
@@ -10,13 +12,15 @@ function offSetMarketTime(data, offSet) {
         } else {
             market.timeToOpen -= offSet
         }
-
-        result.push(market)
     }
 
-    return result
-}
-
+}/**
+ * Update inplace data for line charts.
+ * Add or update symbol data.
+ * @param {Object} dataList The data charts.
+ * @param {String} symbol The symbol on which add or update data.
+ * @param {Integer} newValue The data to add or update
+ */
 function updateChartData(dataList, symbol, newValue) {
 
     let indexData = dataList.findIndex((item) => item.name == symbol)

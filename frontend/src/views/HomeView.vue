@@ -104,9 +104,8 @@ function assignMarketData(data) {
 
     const timestamp = new Date().getTime();
     const offSet = timestamp - data[0].dateCheck * 1000
-    workData = offSetMarketTime(data, offSet)
-
-    Object.assign(marketData, workData)
+    offSetMarketTime(data, offSet)
+    Object.assign(marketData, data)
     resolve()
   }).then(doUpdateMarket[0] = false)
 }
