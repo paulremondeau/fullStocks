@@ -1,6 +1,7 @@
 <template>
     >
-    <VueMultiselect v-model="selectedSymbols" :options="options" :multiple="true" placeHolder="Select symbols">
+    <VueMultiselect v-model="selectedSymbols" :options="options" :multiple="true" :close-on-select="false"
+        placeHolder="Select symbols">
     </VueMultiselect>
 </template>
 
@@ -18,12 +19,6 @@ const props = defineProps({
 const selectedSymbols = ref([])
 selectedSymbols.value.push(...props.selectedSymbols)
 const options = computed(() => props.availableSymbols)
-
-
-function updateSelectedSymbols(selectedSymbols) {
-    emit('input', selectedSymbols.value)
-}
-
 
 
 ///// Emits /////
