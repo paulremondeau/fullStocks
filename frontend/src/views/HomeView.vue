@@ -5,10 +5,14 @@
     <div class="symboldata">
       <div class="lineChart">
         <div class="buttons">
-          <SelectSymbols :availableSymbols="availableSymbols" v-model:selectedSymbols="selectedSymbols"
-            @updateSymbols="updateSymbols" />
-          <button :class="[showPerformance ? 'active' : '']" @click="showPerformance = true">Performance</button>
-          <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
+          <div class="selectedSymbols">
+            <SelectSymbols :availableSymbols="availableSymbols" v-model:selectedSymbols="selectedSymbols"
+              @updateSymbols="updateSymbols" />
+          </div>
+          <div class="performanceValue">
+            <button :class="[showPerformance ? 'active' : '']" @click="showPerformance = true">Performance</button>
+            <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
+          </div>
         </div>
         <LineChart :dataLineChart="showPerformance ? dataLineChartPerformance : dataLineChartValue" />
       </div>
@@ -153,12 +157,26 @@ function processApiResult(symbolData) {
       .buttons {
         display: flex;
         justify-content: center;
-        align-items: center;
+        align-items: end;
 
-        .active {
-          margin: 10px;
-          background-color: lightblue;
+        .selectedSymbols {
+          margin-left: 200px;
         }
+
+        .performanceValue {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 10px;
+          margin-left: 100px;
+
+          .active {
+            background-color: lightblue;
+          }
+
+        }
+
+
 
       }
     }
