@@ -603,9 +603,16 @@ def get_market_state():
                             type: number
                             description: Indicates the timestamp when the market check was made.
 
+        204:
+            description: The data does not exist in database, you can create it with POST /market.
+
 
     """
     data = MarketState.query.all()
+
+    if not data:
+        # Data does not exist
+        return {}, 204
 
     market: Dict[str, str | List[List[float | int]]] = markets_schema.dump(data)
     market = pd.DataFrame(market)
@@ -753,7 +760,7 @@ def update_market_state():
     return {"message": f"Data successfully updated, use GET /market"}, 200
 
 
-@app.route("/symbols/list", methods=["GET"])
+@app.route("/symbols-list", methods=["GET"])
 def get_symbols_list():
     """Get the available symbols.
 
@@ -783,7 +790,7 @@ def get_symbols_list():
                             description: The date of the last check.
 
         204:
-            description: The data does not exist in database, you can create it with POST /symbols/list.
+            description: The data does not exist in database, you can create it with POST /symbols-list.
 
         500:
             description: An error happened server-side.
@@ -810,7 +817,7 @@ def get_symbols_list():
     return symbols_list, 200
 
 
-@app.route("/symbols/list", methods=["POST"])
+@app.route("/symbols-list", methods=["POST"])
 def create_symbols_list():
     """Create the available symbols list.
 
@@ -821,10 +828,10 @@ def create_symbols_list():
     responses:
 
         200:
-            description: The data exists already in database, you can update it with PUT /symbols/list.
+            description: The data exists already in database, you can update it with PUT /symbols-list.
 
         201:
-            description: The data was successfully created, you can get it with GET /symbols/list.
+            description: The data was successfully created, you can get it with GET /symbols-list.
 
         500:
             description: An error happened server-side.
@@ -869,10 +876,10 @@ def create_symbols_list():
             # Error
             return result_from_twelve_data, 500
 
-    return {"message": f"Data successfully created, use GET /symbols/list"}, 201
+    return {"message": f"Data successfully created, use GET /symbols-list"}, 201
 
 
-@app.route("/symbols/list", methods=["PUT"])
+@app.route("/symbols-list", methods=["PUT"])
 def update_symbols_list():
     """Update the available symbols list.
 
@@ -882,10 +889,10 @@ def update_symbols_list():
         - SYMBOLS, SYMBOLS LIST
     responses:
         200:
-            description: The data was successfully updated, you can get it with GET /symbols/list.
+            description: The data was successfully updated, you can get it with GET /symbols-list.
 
         204:
-            description: The data does not exist in database, you can create it with POST /symbols/list.
+            description: The data does not exist in database, you can create it with POST /symbols-list.
 
         500:
             description: An error happened server-side.

@@ -46,9 +46,6 @@ const table = reactive({
   },
 })
 
-function logMe() {
-  console.log(table.rows)
-}
 </script>
 
 

@@ -1,6 +1,7 @@
 <template>
   <div class="home">
-    <MarketState :marketData="marketData" :doUpdateMarket="doUpdateMarket" @updateMarket="updateMarketData" />
+    <MarketState :marketData="marketData" :doUpdateMarket="doUpdateMarket"
+      @updateMarket="fetchBackend('market', 'put').then(newData => assignMarketData(newData))" />
     <div class="symboldata">
       <div class="lineChart">
         <div class="buttons">
@@ -10,134 +11,58 @@
           <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
         </div>
         <LineChart :dataLineChart="showPerformance ? dataLineChartPerformance : dataLineChartValue" />
-        <!-- <LineChart :dataLineChart="dataLineChartValue" v-if="!showPerformance" /> -->
       </div>
     </div>
     <StatsTable :tableData="dataStatsTable" />
   </div>
-  <button @click="logMe">Log Me Home</button>
 </template>
 
 <script setup>
-function logMe() {
-  console.log(dataStatsTable.value)
-  console.log(availableSymbols.value)
-}
+
 
 import { reactive, ref, onMounted, watch } from 'vue'
-import axios from 'axios'
 
+import { fetchBackend } from '../helpers/fetchbackend'
+
+// Components
 import LineChart from '../components/LineChart.vue'
 import StatsTable from '../components/StatsTable.vue'
 import MarketState from '../components/MarketState.vue'
 import SelectSymbols from '../components/SelectSymbols.vue'
-
-
-import apiUrl from '../../config.js'
 
 ///// States /////
 const dataStatsTable = ref([])
 const dataLineChartPerformance = ref([])
 const dataLineChartValue = ref([])
 const marketData = reactive([])
+// TODO : make it a ref and update it in props (computed return read-only, that's why...)
 const doUpdateMarket = reactive([false]) // A   petty trick to update in props...
 const selectedSymbols = ref(['AAPL', 'MSFT', 'META'])
 const availableSymbols = ref([])
 const showPerformance = ref(true)
-const timeDelta = ref("timeDelta")
 
 onMounted(() => {
-  createMarketState()
-  initializeTimeSeries()
-  initializeAvailableSymbols()
+
+  // Initialize Market
+  fetchBackend("market", "post").then(newData => assignMarketData(newData))
+
+  // Initialize symbols timeseries
+  for (let symbol of selectedSymbols.value) {
+    fetchBackend("symbols/" + symbol, 'put').then(symbolData => processApiResult(symbolData))
+  }
+
+  // Initialize available symbols
+  // For now, all symbols at once
+  // TODO : make lists per exchange market
+  // availableSymbols.value = newData
+  fetchBackend("symbols-list", 'get').then((newData) => {
+
+    availableSymbols.value = newData.map(x => x.symbolsList).flat()
+  })
 })
 
 
 ///// Functions /////
-
-function initializeAvailableSymbols() {
-
-  getAvailableSymbols().then((newData) => {
-
-    availableSymbols.value = newData.map(x => x.symbolsList).flat()
-  })
-
-  // For now, all symbols at once
-  // TODO : make lists per exchange market
-  // availableSymbols.value = newData
-
-
-}
-
-function getAvailableSymbols() {
-  return axios
-    .get(apiUrl + "symbols/list")
-    .then((res) => {
-
-      // Data exists
-      if (res.status == 200) {
-        return res.data
-      }
-
-      // Data does not exist
-      if (res.status == 204) {
-        return createAvailableSymbols()
-      }
-
-
-    })
-    .catch((error) => {
-      console.log(error)
-    })
-
-}
-
-function createAvailableSymbols() {
-  return axios
-    .post(apiUrl + "symbols/list")
-    .then((res) => {
-
-
-      // Data already exists
-      if (res.status == 200) {
-        return updateAvailableSymbols()
-      }
-
-      // Data was created
-      if (res.status == 201) {
-        return getAvailableSymbols()
-
-      }
-
-      if (fetchData) {
-
-      }
-
-    }).catch((error) => {
-      console.log(error)
-    })
-}
-
-function updateAvailableSymbols() {
-
-  return axios
-    .put(apiUrl + "symbols/list")
-    .then((res) => {
-
-      // Data successfully update
-      if (res.status == 200) {
-        return getAvailableSymbols()
-      }
-
-      // Data does not exist
-      if (res.status == 204) {
-        return createAvailableSymbols()
-      }
-    })
-
-
-}
-
 function updateSymbols(newSymbols) {
 
 
@@ -147,7 +72,7 @@ function updateSymbols(newSymbols) {
   // One less symbol
   if (selectedSymbols.value.length > newSymbols.value.length) {
     // Get the different symbol
-    console.log("one less")
+    // console.log("one less")
     let removedSymbol = selectedSymbols.value.filter(x => !newSymbols.value.includes(x))[0]
     console.log(removedSymbol)
     selectedSymbols.value = selectedSymbols.value.filter(x => x != removedSymbol)
@@ -165,7 +90,7 @@ function updateSymbols(newSymbols) {
     // Get the different symbol
     let addedSymbol = newSymbols.value.filter(x => !selectedSymbols.value.includes(x))[0]
     console.log(addedSymbol)
-    updateTimeSeries(addedSymbol).then(symbolData => processApiResult(symbolData))
+    fetchBackend("symbols/" + addedSymbol, 'put').then(symbolData => processApiResult(symbolData))
 
     selectedSymbols.value.push(addedSymbol)
   }
@@ -173,44 +98,6 @@ function updateSymbols(newSymbols) {
 
 }
 
-function createMarketState() {
-
-  let fetchData = false
-  let timeOffset = false
-
-  axios
-    .post(apiUrl + "market")
-    .then(async (res) => {
-
-
-      // The data was created on the server
-      if (res.status == 201) {
-
-        fetchData = true
-
-      }
-
-      // The data already exists on the server
-      if (res.status == 200) {
-        timeOffset = true
-        fetchData = true
-
-      }
-
-      if (fetchData) {
-
-        let data = await getMarketState()
-        assignMarketData(data, timeOffset)
-
-      }
-
-    })
-    .catch((error) => {
-      console.log(error)
-    }
-    )
-
-}
 
 function offSetMarketTime(data, offSet) {
 
@@ -232,156 +119,22 @@ function offSetMarketTime(data, offSet) {
 }
 
 
-function assignMarketData(data, timeOffset = false) {
+function assignMarketData(data) {
 
   doUpdateMarket[0] = true
 
-
-
-  new Promise((resolve, reject) => {
+  new Promise((resolve) => {
 
     let workData = data
-    if (timeOffset) {
-      const timestamp = new Date().getTime();
-      const offSet = timestamp - data[0].dateCheck * 1000
-      workData = offSetMarketTime(data, offSet)
-    }
+
+    const timestamp = new Date().getTime();
+    const offSet = timestamp - data[0].dateCheck * 1000
+    workData = offSetMarketTime(data, offSet)
 
     Object.assign(marketData, workData)
     resolve()
   }).then(doUpdateMarket[0] = false)
 }
-
-function updateMarketData() {
-
-  axios
-    .put(apiUrl + "market")
-    .then(async (res) => {
-
-      // Data does not exist on the server
-      if (res.status == 204) {
-        createMarketState()
-      }
-
-      // Data successfully updated
-      if (res.status == 200) {
-
-        let data = await getMarketState()
-        assignMarketData(data)
-      }
-    })
-    .catch((error) => {
-      console.log(error)
-    }
-    )
-
-}
-
-/**
- * Fetch backend for market state information.
- * Disable the timer market then updates the marketData state object.
- * Then enable timer and reset it.
- */
-function getMarketState() {
-
-  return axios
-    .get(apiUrl + "market")
-    .then(res => res.data)
-    .catch((error) => {
-      console.error(error)
-    })
-}
-
-function initializeTimeSeries() {
-
-  for (let symbol of selectedSymbols.value) {
-    console.log(symbol)
-    updateTimeSeries(symbol).then(symbolData => processApiResult(symbolData))
-  }
-
-}
-
-function updateTimeSeries(symbol) {
-
-  return axios
-    .put(apiUrl + "symbols/" + symbol)
-    .then((res) => {
-
-
-
-      // Data does not exist
-      if (res.status == 204) {
-        return createTimeSeries(symbol)
-      }
-
-      // Data successfully update
-      if (res.status == 200) {
-        return getTimeSeries(symbol)
-      }
-
-
-
-    })
-    .catch((error) => {
-
-      if (error.response.status == 304) {
-        return getTimeSeries(symbol)
-      } else {
-        console.log(error)
-      }
-
-    })
-
-}
-
-function createTimeSeries(symbol) {
-
-  return axios({
-    method: 'post',
-    url: apiUrl + 'symbols',
-    data: {
-      symbol: symbol
-    }
-  }).then((res) => {
-
-    // Data already exists
-    if (res.status == 200) {
-      return getTimeSeries(symbol)
-    }
-
-    // Data created
-    if (res.status == 201) {
-      return getTimeSeries(symbol)
-    }
-
-  }).catch((error) => {
-    console.log(error)
-  })
-
-}
-
-function getTimeSeries(symbol) {
-
-  return axios
-    .get(apiUrl + "symbols/" + symbol)
-    .then((res) => {
-
-      // No data found
-      if (res.status == 204) {
-        console.log("No data for symbol " + symbol)
-      }
-
-      // Data found
-      if (res.status == 200) {
-        return res.data
-      }
-
-    }).catch((error) => {
-      console.log(error)
-    })
-
-}
-
 
 /**
  * Add API results to state.
@@ -416,17 +169,6 @@ function updateDataList(dataList, symbol, newValue) {
   }
 }
 
-// watch(selectedSymbols, () => {
-
-//   dataLineChartPerformance.value = dataLineChartPerformance.value.filter((item) => selectedSymbols.value.includes(item.name))
-//   dataLineChartValue.value = dataLineChartValue.value.filter((item) => selectedSymbols.value.includes(item.name))
-//   dataStatsTable.value = dataStatsTable.value.filter((item) => selectedSymbols.value.includes(item.symbol))
-
-//   initializeTimeSeries()
-
-// }
-
-// )
 
 </script>
 

@@ -24,15 +24,12 @@ function updateSelectedSymbols(selectedSymbols) {
     emit('input', selectedSymbols.value)
 }
 
-function logMe() {
-    console.log(select)
-}
+
 
 ///// Emits /////
 const emit = defineEmits(["updateSymbols"])
 
 watch(selectedSymbols, () => {
-    console.log(selectedSymbols)
     emit("updateSymbols", selectedSymbols)
 })
 
