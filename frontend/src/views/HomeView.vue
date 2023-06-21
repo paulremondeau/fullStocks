@@ -23,6 +23,7 @@
 import { reactive, ref, onMounted, watch } from 'vue'
 
 import { fetchBackend } from '../helpers/fetchbackend'
+import { offSetMarketTime, updateChartData } from '../helpers/utils'
 
 // Components
 import LineChart from '../components/LineChart.vue'
@@ -67,54 +68,29 @@ onMounted(() => {
 
 ///// Functions /////
 function updateSymbols(newSymbols) {
-
-
-
   // Two cases : one new symbol or one less symbol
 
   // One less symbol
   if (selectedSymbols.value.length > newSymbols.value.length) {
     // Get the different symbol
-    let removedSymbol = selectedSymbols.value.filter(x => !newSymbols.value.includes(x))[0]
+    const removedSymbol = selectedSymbols.value.filter(x => !newSymbols.value.includes(x))[0]
     selectedSymbols.value = selectedSymbols.value.filter(x => x != removedSymbol)
 
     dataLineChartValue.value = dataLineChartValue.value.filter(x => x.name != removedSymbol)
     dataLineChartPerformance.value = dataLineChartPerformance.value.filter(x => x.name != removedSymbol)
     dataStatsTable.value = dataStatsTable.value.filter(x => x.symbol != removedSymbol)
-
-
   }
 
   // One more symbol
   if (selectedSymbols.value.length < newSymbols.value.length) {
     // Get the different symbol
-    let addedSymbol = newSymbols.value.filter(x => !selectedSymbols.value.includes(x))[0]
+    const addedSymbol = newSymbols.value.filter(x => !selectedSymbols.value.includes(x))[0]
     fetchBackend("symbols/" + addedSymbol, 'put').then(symbolData => processApiResult(symbolData))
 
     selectedSymbols.value.push(addedSymbol)
   }
 
 
-}
-
-
-function offSetMarketTime(data, offSet) {
-
-  let result = []
-
-
-  for (let market of data) {
-
-    if (market.isMarketOpen) {
-      market.timeToClose -= offSet
-    } else {
-      market.timeToOpen -= offSet
-    }
-
-    result.push(market)
-  }
-
-  return result
 }
 
 
@@ -144,8 +120,8 @@ function processApiResult(symbolData) {
   let symbol = symbolData.stats.symbol
 
 
-  updateDataList(dataLineChartPerformance.value, symbol, symbolData.timeseries.performance)
-  updateDataList(dataLineChartValue.value, symbol, symbolData.timeseries.values)
+  updateChartData(dataLineChartPerformance.value, symbol, symbolData.timeseries.performance)
+  updateChartData(dataLineChartValue.value, symbol, symbolData.timeseries.values)
 
 
   let indexData = dataStatsTable.value.findIndex((item) => item.symbol == symbol)
@@ -155,18 +131,6 @@ function processApiResult(symbolData) {
     dataStatsTable.value.push(symbolData.stats)
   }
 }
-
-function updateDataList(dataList, symbol, newValue) {
-
-  let indexData = dataList.findIndex((item) => item.name == symbol)
-  let newData = { name: symbol, data: newValue }
-  if (indexData >= 0) {
-    dataList[indexData] = newData
-  } else {
-    dataList.push(newData)
-  }
-}
-
 
 </script>
 
