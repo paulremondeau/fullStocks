@@ -48,7 +48,10 @@ onMounted(() => {
 
   // Initialize symbols timeseries
   for (let symbol of selectedSymbols.value) {
-    fetchBackend("symbols/" + symbol, 'put').then(symbolData => processApiResult(symbolData))
+
+    fetchBackend("symbols/" + symbol, 'put').then((symbolData) => {
+      processApiResult(symbolData)
+    })
   }
 
   // Initialize available symbols
@@ -72,9 +75,7 @@ function updateSymbols(newSymbols) {
   // One less symbol
   if (selectedSymbols.value.length > newSymbols.value.length) {
     // Get the different symbol
-    // console.log("one less")
     let removedSymbol = selectedSymbols.value.filter(x => !newSymbols.value.includes(x))[0]
-    console.log(removedSymbol)
     selectedSymbols.value = selectedSymbols.value.filter(x => x != removedSymbol)
 
     dataLineChartValue.value = dataLineChartValue.value.filter(x => x.name != removedSymbol)
@@ -86,10 +87,8 @@ function updateSymbols(newSymbols) {
 
   // One more symbol
   if (selectedSymbols.value.length < newSymbols.value.length) {
-    console.log("one more")
     // Get the different symbol
     let addedSymbol = newSymbols.value.filter(x => !selectedSymbols.value.includes(x))[0]
-    console.log(addedSymbol)
     fetchBackend("symbols/" + addedSymbol, 'put').then(symbolData => processApiResult(symbolData))
 
     selectedSymbols.value.push(addedSymbol)
@@ -150,7 +149,6 @@ function processApiResult(symbolData) {
 
 
   let indexData = dataStatsTable.value.findIndex((item) => item.symbol == symbol)
-  console.log(indexData)
   if (indexData >= 0) {
     dataStatsTable.value[indexData] = symbolData.stats
   } else {

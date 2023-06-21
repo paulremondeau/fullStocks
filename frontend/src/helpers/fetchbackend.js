@@ -22,8 +22,14 @@ function fetchBackend(endpoint, method, data = {}) {
                 }
 
             case 'post':
-                // Data either already exists or does not exist, get it anyway
-                return fetchBackend(endpoint, 'get')
+                // Data either already exists or was created, get it anyway
+                if (Object.keys(data).includes("symbol")) {
+                    // Symbol was created, must update endpoint to get it
+                    return fetchBackend(endpoint + "/" + data.symbol, 'get')
+                } else {
+                    return fetchBackend(endpoint, 'get')
+                }
+
 
             case 'put':
                 switch (res.status) {
