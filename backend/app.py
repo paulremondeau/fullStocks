@@ -52,7 +52,9 @@ import logging
 import logging.config
 
 import pandas as pd
+import pytz
 
+EUROPE_TIMEZONE = pytz.timezone("Europe/Paris")
 
 from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
@@ -166,6 +168,30 @@ class MarketStateSchema(ma.Schema):
 
 market_schema = MarketStateSchema()
 markets_schema = MarketStateSchema(many=True)
+
+
+class AvailableSymbols(db.Model):
+    exchange = db.Column(db.String(EXCHANGE_LENGTH), primary_key=True)
+    symbolsList = db.Column(db.PickleType())
+    dateCheck = db.Column(db.Float)
+
+    def __init__(self, exchange, symbolsList, dateCheck):
+        self.exchange = exchange
+        self.symbolsList = symbolsList
+        self.dateCheck = dateCheck
+
+
+class AvailableSymbolsSchema(ma.Schema):
+    class Meta:
+        fields = (
+            "exchange",
+            "symbolsList",
+            "dateCheck",
+        )
+
+
+available_symbols_schema = AvailableSymbolsSchema()
+available_symbols_many_schema = AvailableSymbolsSchema(many=True)
 
 db.create_all()
 
@@ -427,6 +453,7 @@ def get_symbol_data(symbol: str):
         return {"timeseries": data_result, "stats": stats_table}, 200
 
 
+# TODO : market is closed but new data is available (delta > 2* chosen delta) -> modify this !!
 @app.route("/symbols/<symbol>", methods=["PUT"])
 def update_symbol_data(symbol: str):
     """Update one specific symbol.
@@ -487,14 +514,24 @@ def update_symbol_data(symbol: str):
 
     else:
         # Check if data is fresh enough
+        timezone = old_data.timezone
+        tz = pytz.timezone(timezone)
         delta_size = int(re.findall("\d+", max_delta)[0])
         delta_unit = convert_delta_unit[re.findall("\D+", max_delta)[0]]
 
-        time_delta = datetime.datetime.today() - old_data.timeseries.index[-1]
+        time_delta = datetime.datetime.now(tz=tz) - tz.localize(
+            old_data.timeseries.index[-1]
+        )
+
+        print(datetime.datetime.now(tz=tz))
+
+        print(tz.localize(old_data.timeseries.index[-1]))
+
         if time_delta < datetime.timedelta(**{delta_unit: delta_size}):
+            # if True:
             # Data is fresh enough
             logger.warning(
-                f"Last data point is younger than {delta_size} {delta_unit}, no new data available."
+                f"Last data point is younger than {delta_size} {delta_unit}, no new data available. Last data is {time_delta} old."
             )
             return {}, 304
 
@@ -566,9 +603,16 @@ def get_market_state():
                             type: number
                             description: Indicates the timestamp when the market check was made.
 
+        204:
+            description: The data does not exist in database, you can create it with POST /market.
+
 
     """
     data = MarketState.query.all()
+
+    if not data:
+        # Data does not exist
+        return {}, 204
 
     market: Dict[str, str | List[List[float | int]]] = markets_schema.dump(data)
     market = pd.DataFrame(market)
@@ -616,6 +660,7 @@ def create_market_state():
     else:
         result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
         if result_from_twelve_data["status"] == "ok":
+            date_check = datetime.datetime.now(tz=EUROPE_TIMEZONE).timestamp()
             data_market = result_from_twelve_data["data"]
             for data_exchange in data_market.iloc:
                 # Adding each market one by one
@@ -627,7 +672,7 @@ def create_market_state():
                         isMarketOpen=data_exchange["isMarketOpen"],
                         timeToOpen=data_exchange["timeToOpen"],
                         timeToClose=data_exchange["timeToClose"],
-                        dateCheck=datetime.datetime.now().timestamp(),
+                        dateCheck=date_check,
                     )
                 )
 
@@ -679,6 +724,9 @@ def update_market_state():
         result_from_twelve_data = request_twelvedata_api.get_markets_state(API_KEY)
         if result_from_twelve_data["status"] == "ok":
             data_market = result_from_twelve_data["data"]
+
+            date_check = datetime.datetime.now(tz=EUROPE_TIMEZONE).timestamp()
+
             for data_exchange in data_market.iloc:
                 old_exchange_data = db.session.get(
                     MarketState, data_exchange["exchange"]
@@ -693,7 +741,7 @@ def update_market_state():
                             isMarketOpen=data_exchange["isMarketOpen"],
                             timeToOpen=data_exchange["timeToOpen"],
                             timeToClose=data_exchange["timeToClose"],
-                            dateCheck=datetime.datetime.now().timestamp(),
+                            dateCheck=date_check,
                         )
                     )
 
@@ -701,7 +749,7 @@ def update_market_state():
                     old_exchange_data.isMarketOpen = data_exchange["isMarketOpen"]
                     old_exchange_data.timeToOpen = data_exchange["timeToOpen"]
                     old_exchange_data.timeToClose = data_exchange["timeToClose"]
-                    old_exchange_data.dateCheck = datetime.datetime.now().timestamp()
+                    old_exchange_data.dateCheck = date_check
 
             db.session.commit()
 
@@ -710,6 +758,208 @@ def update_market_state():
             return result_from_twelve_data, 500
 
     return {"message": f"Data successfully updated, use GET /market"}, 200
+
+
+@app.route("/symbols-list", methods=["GET"])
+def get_symbols_list():
+    """Get the available symbols.
+
+    Get the symbols available for the given plan.
+    ---
+    tags:
+        - SYMBOLS, SYMBOLS LIST
+    responses:
+        200:
+            description: Request successful, returning available symbols.
+            schema:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        exchange:
+                            type: string
+                            description: The market exchange name.
+                        symbolsList:
+                            type: array
+                            description: The available symbols list for this exchange.
+                            items:
+                                type: string
+                                description: Symbol available.
+                        dateCheck:
+                            type: number
+                            description: The date of the last check.
+
+        204:
+            description: The data does not exist in database, you can create it with POST /symbols-list.
+
+        500:
+            description: An error happened server-side.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case.
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+    """
+    data = AvailableSymbols.query.all()
+
+    if not data:
+        return {}, 204
+
+    symbols_list: Dict[str, str | List[str]] = available_symbols_many_schema.dump(data)
+
+    return symbols_list, 200
+
+
+@app.route("/symbols-list", methods=["POST"])
+def create_symbols_list():
+    """Create the available symbols list.
+
+    Create the symbols available for the given plan.
+    ---
+    tags:
+        - SYMBOLS, SYMBOLS LIST
+    responses:
+
+        200:
+            description: The data exists already in database, you can update it with PUT /symbols-list.
+
+        201:
+            description: The data was successfully created, you can get it with GET /symbols-list.
+
+        500:
+            description: An error happened server-side.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case.
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+    """
+    data = AvailableSymbols.query.all()
+    if data:
+        # Data exists already
+        return {"message": f"Data already exists, use GET /market"}, 200
+
+    else:
+        result_from_twelve_data = request_twelvedata_api.get_available_symbols_list(
+            API_KEY, API_PLAN
+        )
+
+        if result_from_twelve_data["status"] == "ok":
+            date_check = datetime.datetime.now(tz=EUROPE_TIMEZONE).timestamp()
+
+            for exchange, symbols_list in result_from_twelve_data["data"].items():
+                db.session.add(
+                    AvailableSymbols(
+                        exchange=exchange,
+                        symbolsList=symbols_list,
+                        dateCheck=date_check,
+                    )
+                )
+
+            db.session.commit()
+
+        else:
+            # Error
+            return result_from_twelve_data, 500
+
+    return {"message": f"Data successfully created, use GET /symbols-list"}, 201
+
+
+@app.route("/symbols-list", methods=["PUT"])
+def update_symbols_list():
+    """Update the available symbols list.
+
+    Update the symbols available for the given plan.
+    ---
+    tags:
+        - SYMBOLS, SYMBOLS LIST
+    responses:
+        200:
+            description: The data was successfully updated, you can get it with GET /symbols-list.
+
+        204:
+            description: The data does not exist in database, you can create it with POST /symbols-list.
+
+        500:
+            description: An error happened server-side.
+            schema:
+                type: object
+                properties:
+                    status:
+                        type: string
+                        description: The status of the request, which will be 'error' in this case.
+                    code:
+                        type: integer
+                        description: The associated error code.
+                    message:
+                        type: string
+                        description: The error message associated.
+    """
+    data = AvailableSymbols.query.all()
+
+    if not data:
+        return {}, 204
+
+    data_dumped = available_symbols_many_schema.dump(data)
+    date_check = data_dumped[0]["dateCheck"]
+
+    time_delta = datetime.datetime.now(
+        tz=EUROPE_TIMEZONE
+    ) - datetime.datetime.fromtimestamp(date_check, tz=EUROPE_TIMEZONE)
+
+    if time_delta < datetime.timedelta(days=1):
+        # if True:
+        # Data is fresh enough
+        logger.warning(
+            f"Last update of available symbols list is not older than 1, no new data available. Last data is {time_delta} old."
+        )
+        return {}, 304
+
+    else:
+        result_from_twelve_data = request_twelvedata_api.get_available_symbols_list(
+            API_KEY, API_PLAN
+        )
+
+        if result_from_twelve_data["status"] == "ok":
+            date_check = datetime.datetime.now(tz=EUROPE_TIMEZONE).timestamp()
+
+            for exchange, symbols_list in result_from_twelve_data["data"].items():
+                old_data = db.session.get(AvailableSymbols, exchange)
+                if old_data is None:
+                    # Crate data
+                    db.session.add(
+                        AvailableSymbols(
+                            exchange=exchange,
+                            symbolsList=symbols_list,
+                            dateCheck=date_check,
+                        )
+                    )
+                else:
+                    # Update data
+                    old_data.symbolsList = symbols_list
+                    old_data.dateCheck = date_check
+
+            db.session.commit()
+
+        else:
+            # Error
+            return result_from_twelve_data, 500
+
+    return {}, 200
 
 
 @app.route("/spec")

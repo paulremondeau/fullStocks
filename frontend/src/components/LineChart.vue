@@ -1,6 +1,6 @@
 
 <template>
-  <apexchart type="line" height="700" width="1200" :options="data.chartOptions" :series="data.series">
+  <apexchart type="line" :height="700" :options="data.chartOptions" :series="data.series">
   </apexchart>
 </template>
 
@@ -18,7 +18,7 @@ const props = defineProps({
 
 // Needed to make the chart reactive to option change
 const minimum = computed(() => {
-  return data.series.length == 0 ? 0 : data.series[Object.keys(data.series)[0]].data[0][0]
+  return data.series.length == 0 ? 0 : data.series[0].data[0][0]
 })
 
 const title = computed(() => props.title)

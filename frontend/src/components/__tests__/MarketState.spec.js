@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 import { mount, } from '@vue/test-utils'
 import MarketState from '../MarketState.vue'
 
-import { reactive } from 'vue'
 
 function delay(milliseconds) {
     return new Promise(resolve => {

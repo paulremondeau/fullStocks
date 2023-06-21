@@ -4,29 +4,29 @@ import { mount } from '@vue/test-utils'
 import LineChart from '../LineChart.vue'
 
 describe('LineChart', () => {
-  
-    it ('initial render is empty', () => {
-        
-        const wrapper = mount(LineChart, 
+
+    it('initial render is empty', () => {
+
+        const wrapper = mount(LineChart,
             {
-                props: 
+                props:
                 {
                     dataLineChart: []
                 }
-        })
+            })
         expect(wrapper.text()).toBe("")
 
     })
 
-    it ('it renders data properly', () => {
-        
-        const wrapper = mount(LineChart, 
+    it('it renders data properly', () => {
+
+        const wrapper = mount(LineChart,
             {
-                props: 
+                props:
                 {
-                    dataLineChart: [{ name: "foo", data: [[10,1], [121,10], [150,5]] }, {name: "abcd", data: [[10,1], [15,10], [150,5]]}]
+                    dataLineChart: [{ name: "foo", data: [[10, 1], [121, 10], [150, 5]] }, { name: "abcd", data: [[10, 1], [15, 10], [150, 5]] }]
                 }
-        })
+            })
 
         expect(wrapper.text()).toBe("")
 

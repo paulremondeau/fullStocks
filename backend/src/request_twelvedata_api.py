@@ -19,6 +19,7 @@ __logger__ = "request_twelvedata_api.py"
 # =================================================================================================
 
 import os
+import json
 
 from typing import List, Dict
 from copy import copy
@@ -326,3 +327,65 @@ def get_markets_state(api_key: str) -> Dict[str, str | int | pd.DataFrame]:
     response_json["data"] = df
 
     return response_json
+
+
+@handle_exception
+def get_available_symbols_list(
+    api_key: str, plan: str = "Basic"
+) -> Dict[str, str | Dict[str, List[str]]]:
+    """Retrieves available symbol.
+
+    Fetch Twelve data API for symbols available with the given plan?
+
+    Parameters
+    ----------
+    api_key : str
+        The API key
+    plan : str, optional
+        The desired plan, by default "Basic".
+
+    Returns
+    -------
+    Dict[str, str | Dict[str, List[str]]]
+        Dict with result
+
+    Examples
+    ----------
+
+    If all goes right :
+
+    >>> res = get_available_symbols_list(API_KEY, "Basic")
+    >>> res['status']
+    ok
+    >>> res['data']
+        {'ASE': ['HTO'],
+    'ASX': ['ADS', 'PKO', 'TRP', 'WBC'],
+    'BCBA': ['AAPL', 'ADS', 'INFY', 'MELI', 'QQQ'],
+    'BIST': ['THYAO'],
+    ...
+    'XETR': ['ADS', 'VOW3'],
+    'XHAN': ['ADS', 'VOW3'],
+    'XKUW': ['CGCK'],
+    'XSTU': ['4BD', 'ADS', 'MAOA']}
+
+    If something went wrong :
+
+    >>> get_available_symbols_list(API_KEY, "Basic")
+    {"status": "error", "code": 500, "message": "Erreur"}
+
+    See :func:`src.exceptions_twelvedata_api.handle_exception` for more informations on possible errors.
+    """
+    params = {"apikey": api_key, "show_plan": True}
+    response = requests.get(twelvedata_api_config["symbols_url"], params=params)
+
+    response_json = check_twelvedata_api_response(response)
+
+    data = pd.DataFrame(response_json["data"])
+
+    data_plan = data[data["access"].apply(lambda x: x["plan"] == plan)]
+
+    result = json.loads(
+        data_plan.groupby("exchange").agg({"symbol": list})["symbol"].to_json()
+    )
+
+    return {"status": "ok", "data": result}
