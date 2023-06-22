@@ -9,6 +9,12 @@
             <SelectSymbols :availableSymbols="availableSymbols" v-model:selectedSymbols="selectedSymbols"
               @updateSymbols="updateSymbols" />
           </div>
+          <ul class="timeDelta">
+            <li v-for="timeDelta in timeDeltas">
+              <button :class="[chosenTimeDelta == timeDelta ? 'active' : '']" @click="chosenTimeDelta = timeDelta">{{
+                timeDelta }}</button>
+            </li>
+          </ul>
           <div class="performanceValue">
             <button :class="[showPerformance ? 'active' : '']" @click="showPerformance = true">Performance</button>
             <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
@@ -45,6 +51,9 @@ const doUpdateMarket = reactive([false]) // A   petty trick to update in props..
 const selectedSymbols = ref(['AAPL', 'MSFT', 'META'])
 const availableSymbols = ref([])
 const showPerformance = ref(true)
+
+const timeDeltas = ref(["1min", "5min", "15min", "30min", "45min", "1h", "2h", "4h", "1day", "1week", "1month"])
+const chosenTimeDelta = ref("1day")
 
 onMounted(() => {
 
@@ -159,6 +168,14 @@ function processApiResult(symbolData) {
         justify-content: center;
         align-items: end;
 
+        ul.timeDelta {
+          display: flex;
+          list-style-type: none;
+          justify-content: space-between;
+
+
+        }
+
         .selectedSymbols {
           margin-left: 200px;
         }
@@ -170,13 +187,11 @@ function processApiResult(symbolData) {
           padding: 10px;
           margin-left: 100px;
 
-          .active {
-            background-color: lightblue;
-          }
-
         }
 
-
+        .active {
+          background-color: lightblue;
+        }
 
       }
     }
