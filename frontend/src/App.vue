@@ -18,15 +18,14 @@ import Header from './components/Header.vue'
 <style scoped lang="scss">
 .app {
   display: inline;
-  width: 100vw;
-
 
   .header {
-    height: 5vh;
+    height: 7vh;
+    background: linear-gradient(0.25turn, rgb(241, 238, 238), rgb(209, 210, 226));
+
   }
 
   .router {
-    height: 95vh;
     padding: 0 10px 0 10px;
   }
 

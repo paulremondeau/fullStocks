@@ -186,7 +186,7 @@ $slideWidth: 100px;
         .slide {
 
             width: $slideWidth;
-            line-height: 15px;
+            line-height: 18px;
             text-align: center;
 
             h1 {

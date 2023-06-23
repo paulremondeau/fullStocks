@@ -1,30 +1,42 @@
 <template>
   <div class="home">
-    <div class="symboldata">
-      <div class="lineChart">
+    <div class="lineChart">
+      <div class="chartOptions">
+        <div class="selectedSymbols">
+          <h2>Select symbols</h2>
+          <SelectSymbols :availableSymbols="availableSymbols" v-model:selectedSymbols="selectedSymbols"
+            @updateSymbols="updateSymbols" />
+        </div>
         <div class="buttons">
-          <div class="selectedSymbols">
-            <SelectSymbols :availableSymbols="availableSymbols" v-model:selectedSymbols="selectedSymbols"
-              @updateSymbols="updateSymbols" />
-          </div>
-          <ul class="timeDelta">
+          <h2>Select time interval</h2>
+          <ul>
             <li v-for="timeDelta in timeDeltas">
               <button :class="[chosenTimeDelta == timeDelta ? 'active' : '']" @click="chosenTimeDelta = timeDelta">{{
                 timeDelta }}</button>
             </li>
           </ul>
-          <div class="performanceValue">
-            <button :class="[showPerformance ? 'active' : '']" @click="showPerformance = true">Performance</button>
-            <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
-          </div>
         </div>
-        <LineChart :dataLineChart="showPerformance
-          ? dataLineChartPerformance[chosenTimeDelta]
-          : dataLineChartValue[chosenTimeDelta]" />
+        <div></div>
+        <div class="buttons">
+          <h2>Select data kind</h2>
+          <ul>
+            <li>
+              <button :class="[showPerformance ? 'active' : '']" @click="showPerformance = true">Performance</button>
+            </li>
+            <li>
+              <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
+            </li>
+          </ul>
+        </div>
       </div>
+      <LineChart :dataLineChart="showPerformance
+        ? dataLineChartPerformance[chosenTimeDelta]
+        : dataLineChartValue[chosenTimeDelta]" />
     </div>
-    <StatsTable :tableData="dataStatsTable" />
-    <button @click="logMe">Log Me home</button>
+    <div class="statsTable">
+      <h1>Statistical informations</h1>
+      <StatsTable :tableData="dataStatsTable" />
+    </div>
   </div>
 </template>
 
@@ -145,51 +157,54 @@ watch(chosenTimeDelta, initTimeSeries)
 .home {
   display: inline;
 
-  .symboldata {
-    display: flex;
-    margin-top: 20px;
-    justify-content: space-between;
-    align-items: center;
+  .lineChart {
+    display: inline;
     text-align: center;
 
 
+    .chartOptions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      // background-color: blue;
+      padding: 5px;
 
-    .lineChart {
-      flex: 6;
-      display: inline;
+      .selectedSymbols {
+        display: inline;
+      }
 
       .buttons {
-        display: flex;
-        justify-content: center;
-        align-items: end;
+        display: inline;
 
-        ul.timeDelta {
+        ul {
           display: flex;
           list-style-type: none;
           justify-content: space-between;
 
+          li {
+            text-align: justify;
 
+            button {
+              margin: 0 5px 0 0;
+              height: 100%;
+              font-size: 15px;
+              width: 100px;
+            }
+
+            button.active {
+              background-color: lightblue;
+            }
+
+          }
         }
-
-        .selectedSymbols {
-          margin-left: 200px;
-        }
-
-        .performanceValue {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 10px;
-          margin-left: 100px;
-
-        }
-
-        .active {
-          background-color: lightblue;
-        }
-
       }
     }
+
+  }
+
+  .statsTable {
+    text-align: center;
+    display: inline;
   }
 }
 </style>

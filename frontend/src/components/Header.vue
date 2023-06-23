@@ -5,7 +5,10 @@
             <MarketState :marketData="marketData" :doUpdateMarket="doUpdateMarket"
                 @updateMarket="fetchBackend('market', 'put').then(newData => assignMarketData(newData))" />
         </div>
-        <h1 class="search"></h1>
+        <!-- <div class="logo"></div> -->
+        <a href="https://paulremondeau.github.io">
+            <img src="../assets/github.svg" class="logo" />
+        </a>
     </div>
 </template>
 
@@ -52,18 +55,19 @@ function assignMarketData(data) {
     justify-content: space-between;
     align-items: center;
     height: 100%;
-    background: linear-gradient(0.25turn, rgb(241, 238, 238), rgb(209, 210, 226));
 
     .name {
-        width: 8vw
+        width: 8vw;
+        line-height: 30px;
+        margin-left: 10px;
     }
 
     .market {
-        width: 88vw
+        width: 87vw
     }
 
-    .search {
-        width: 2vw;
+    img.logo {
+        margin-right: 10px;
     }
 
 
