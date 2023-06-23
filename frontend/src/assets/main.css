@@ -2,8 +2,8 @@
 
 #app {
   width: 100vw;
-  margin: 0 auto;
-  padding: 2rem;
+  margin: 0;
+
 
   font-weight: normal;
 }
@@ -25,11 +25,13 @@ a,
   body {
     display: flex;
     place-items: center;
+    margin: 0;
+    padding: 0;
   }
 
   #app {
     display: inline;
     grid-template-columns: 1fr 1fr;
-    padding: 0 2rem 2rem;
+    padding: 0;
   }
 }

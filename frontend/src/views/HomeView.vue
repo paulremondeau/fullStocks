@@ -1,33 +1,43 @@
 <template>
   <div class="home">
-    <MarketState :marketData="marketData" :doUpdateMarket="doUpdateMarket"
-      @updateMarket="fetchBackend('market', 'put').then(newData => assignMarketData(newData))" />
-    <div class="symboldata">
-      <div class="lineChart">
+    <div class="lineChart">
+      <div class="chartOptions">
+        <div class="selectedSymbols">
+          <h2>Select symbols</h2>
+          <SelectSymbols :availableSymbols="availableSymbols" v-model:selectedSymbols="selectedSymbols"
+            @updateSymbols="updateSymbols" />
+        </div>
         <div class="buttons">
-          <div class="selectedSymbols">
-            <SelectSymbols :availableSymbols="availableSymbols" v-model:selectedSymbols="selectedSymbols"
-              @updateSymbols="updateSymbols" />
-          </div>
-          <ul class="timeDelta">
+          <h2>Select time interval</h2>
+          <ul>
             <li v-for="timeDelta in timeDeltas">
               <button :class="[chosenTimeDelta == timeDelta ? 'active' : '']" @click="chosenTimeDelta = timeDelta">{{
                 timeDelta }}</button>
             </li>
           </ul>
-          <div class="performanceValue">
-            <button :class="[showPerformance ? 'active' : '']" @click="showPerformance = true">Performance</button>
-            <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
-          </div>
         </div>
-        <LineChart :dataLineChart="showPerformance
-          ? dataLineChartPerformance[chosenTimeDelta]
-          : dataLineChartValue[chosenTimeDelta]" />
+        <div></div>
+        <div class="buttons">
+          <h2>Select data kind</h2>
+          <ul>
+            <li>
+              <button :class="[showPerformance ? 'active' : '']" @click="showPerformance = true">Performance</button>
+            </li>
+            <li>
+              <button :class="[!showPerformance ? 'active' : '']" @click="showPerformance = false">Value</button>
+            </li>
+          </ul>
+        </div>
       </div>
+      <LineChart :dataLineChart="showPerformance
+        ? dataLineChartPerformance[chosenTimeDelta]
+        : dataLineChartValue[chosenTimeDelta]" />
     </div>
-    <StatsTable :tableData="dataStatsTable" />
+    <div class="statsTable">
+      <h1>Statistical informations</h1>
+      <StatsTable :tableData="dataStatsTable" />
+    </div>
   </div>
-  <button @click="logMe">Log Me home</button>
 </template>
 
 <script setup>
@@ -36,12 +46,11 @@
 import { reactive, ref, onMounted, watch } from 'vue'
 
 import { fetchBackend } from '../helpers/fetchbackend'
-import { offSetMarketTime, updateChartData } from '../helpers/utils'
+import { updateChartData } from '../helpers/utils'
 
 // Components
 import LineChart from '../components/LineChart.vue'
 import StatsTable from '../components/StatsTable.vue'
-import MarketState from '../components/MarketState.vue'
 import SelectSymbols from '../components/SelectSymbols.vue'
 
 const timeDeltas = ["1min", "5min", "15min", "30min", "45min", "1h", "2h", "4h", "1day", "1week", "1month"]
@@ -52,7 +61,6 @@ const dataLineChartPerformance = reactive(Object.fromEntries(timeDeltas.map(i =>
 const dataLineChartValue = reactive(Object.fromEntries(timeDeltas.map(i => [i, []])))
 const marketData = reactive([])
 // TODO : make it a ref and update it in props (computed return read-only, that's why...)
-const doUpdateMarket = reactive([false]) // A   petty trick to update in props...
 const selectedSymbols = ref(['AAPL', 'MSFT', 'META'])
 const availableSymbols = ref([])
 const showPerformance = ref(true)
@@ -61,13 +69,6 @@ const showPerformance = ref(true)
 const chosenTimeDelta = ref("4h")
 
 onMounted(() => {
-
-  // Initialize Market
-  fetchBackend("market", "post")
-    .then(newData => assignMarketData(newData))
-    .catch((error) => {
-      console.log(error)
-    })
 
   // Initialize symbols timeseries
   initTimeSeries()
@@ -128,22 +129,6 @@ function updateSymbols(newSymbols) {
 }
 
 
-function assignMarketData(data) {
-
-  doUpdateMarket[0] = true
-
-  new Promise((resolve) => {
-
-    let workData = data
-
-    const timestamp = new Date().getTime();
-    const offSet = timestamp - data[0].dateCheck * 1000
-    offSetMarketTime(data, offSet)
-    Object.assign(marketData, data)
-    resolve()
-  }).then(doUpdateMarket[0] = false)
-}
-
 /**
  * Add API results to state.
  * @param {Object} res The results from the backend API.
@@ -172,51 +157,54 @@ watch(chosenTimeDelta, initTimeSeries)
 .home {
   display: inline;
 
-  .symboldata {
-    display: flex;
-    margin-top: 20px;
-    justify-content: space-between;
-    align-items: center;
+  .lineChart {
+    display: inline;
     text-align: center;
 
 
+    .chartOptions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      // background-color: blue;
+      padding: 5px;
 
-    .lineChart {
-      flex: 6;
-      display: inline;
+      .selectedSymbols {
+        display: inline;
+      }
 
       .buttons {
-        display: flex;
-        justify-content: center;
-        align-items: end;
+        display: inline;
 
-        ul.timeDelta {
+        ul {
           display: flex;
           list-style-type: none;
           justify-content: space-between;
 
+          li {
+            text-align: justify;
 
+            button {
+              margin: 0 5px 0 0;
+              height: 100%;
+              font-size: 15px;
+              width: 100px;
+            }
+
+            button.active {
+              background-color: lightblue;
+            }
+
+          }
         }
-
-        .selectedSymbols {
-          margin-left: 200px;
-        }
-
-        .performanceValue {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 10px;
-          margin-left: 100px;
-
-        }
-
-        .active {
-          background-color: lightblue;
-        }
-
       }
     }
+
+  }
+
+  .statsTable {
+    text-align: center;
+    display: inline;
   }
 }
 </style>

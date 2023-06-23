@@ -574,7 +574,7 @@ def update_symbol_data(symbol: str):
 
             else:
                 result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
-                    symbol, data_time_delta, API_KEY
+                    symbol, time_delta, API_KEY
                 )
                 if result_from_twelve_data["status"] == "ok":
                     old_data.timeseries = result_from_twelve_data["data"]
