@@ -50,7 +50,7 @@ def test_evaluate_cumulative_return():
             ]
         ),
     )
-    assert np.isnan(evaluate_cumulative_return(data))
+    assert evaluate_cumulative_return(data) == "-"
 
     # Should work if data is good
     data = pd.Series(
@@ -84,7 +84,7 @@ def test_evaluate_annualized_return():
             ]
         ),
     )
-    assert np.isnan(evaluate_annualized_return(data, n_years=1))
+    assert evaluate_annualized_return(data, n_years=1) == "-"
 
     data = pd.Series(
         [1, 5, 7, 2, 3],
@@ -98,7 +98,7 @@ def test_evaluate_annualized_return():
             ]
         ),
     )
-    assert np.isnan(evaluate_annualized_return(data, n_years=2))
+    assert evaluate_annualized_return(data, n_years=2) == "-"
 
     # Should work if data is timely wide enough
     assert evaluate_annualized_return(data, n_years=1) == 200.0
