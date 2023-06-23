@@ -1,7 +1,5 @@
 <template>
   <div class="home">
-    <MarketState :marketData="marketData" :doUpdateMarket="doUpdateMarket"
-      @updateMarket="fetchBackend('market', 'put').then(newData => assignMarketData(newData))" />
     <div class="symboldata">
       <div class="lineChart">
         <div class="buttons">
@@ -26,8 +24,8 @@
       </div>
     </div>
     <StatsTable :tableData="dataStatsTable" />
+    <button @click="logMe">Log Me home</button>
   </div>
-  <button @click="logMe">Log Me home</button>
 </template>
 
 <script setup>
@@ -36,12 +34,11 @@
 import { reactive, ref, onMounted, watch } from 'vue'
 
 import { fetchBackend } from '../helpers/fetchbackend'
-import { offSetMarketTime, updateChartData } from '../helpers/utils'
+import { updateChartData } from '../helpers/utils'
 
 // Components
 import LineChart from '../components/LineChart.vue'
 import StatsTable from '../components/StatsTable.vue'
-import MarketState from '../components/MarketState.vue'
 import SelectSymbols from '../components/SelectSymbols.vue'
 
 const timeDeltas = ["1min", "5min", "15min", "30min", "45min", "1h", "2h", "4h", "1day", "1week", "1month"]
@@ -52,7 +49,6 @@ const dataLineChartPerformance = reactive(Object.fromEntries(timeDeltas.map(i =>
 const dataLineChartValue = reactive(Object.fromEntries(timeDeltas.map(i => [i, []])))
 const marketData = reactive([])
 // TODO : make it a ref and update it in props (computed return read-only, that's why...)
-const doUpdateMarket = reactive([false]) // A   petty trick to update in props...
 const selectedSymbols = ref(['AAPL', 'MSFT', 'META'])
 const availableSymbols = ref([])
 const showPerformance = ref(true)
@@ -61,13 +57,6 @@ const showPerformance = ref(true)
 const chosenTimeDelta = ref("4h")
 
 onMounted(() => {
-
-  // Initialize Market
-  fetchBackend("market", "post")
-    .then(newData => assignMarketData(newData))
-    .catch((error) => {
-      console.log(error)
-    })
 
   // Initialize symbols timeseries
   initTimeSeries()
@@ -127,22 +116,6 @@ function updateSymbols(newSymbols) {
 
 }
 
-
-function assignMarketData(data) {
-
-  doUpdateMarket[0] = true
-
-  new Promise((resolve) => {
-
-    let workData = data
-
-    const timestamp = new Date().getTime();
-    const offSet = timestamp - data[0].dateCheck * 1000
-    offSetMarketTime(data, offSet)
-    Object.assign(marketData, data)
-    resolve()
-  }).then(doUpdateMarket[0] = false)
-}
 
 /**
  * Add API results to state.

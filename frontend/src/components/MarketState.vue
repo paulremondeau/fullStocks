@@ -117,14 +117,20 @@ watch(currentTime, () => {
 
 
 <style scoped lang="scss">
-@mixin white-gradient {
-    background: linear-gradient(to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100%);
+// @mixin white-gradient {
+//     background: linear-gradient(to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 100%);
+// }
+@mixin left-gradient {
+    background: linear-gradient(to right, rgba(241, 238, 238, 1) 0%, rgba(241, 238, 238, 0) 100%);
+}
+
+@mixin right-gradient {
+    background: linear-gradient(to right, rgba(209, 210, 226, 1) 0%, rgba(209, 210, 226, 0) 100%);
 }
 
 // Scroll adapts to number of child component to make it look continuous
 $numberOfExhanges: v-bind('numberOfExhanges');
 $animationSpeed: 40s;
-$sliderHeight: 80px;
 $slideWidth: 100px;
 
 // Animation
@@ -141,28 +147,33 @@ $slideWidth: 100px;
 // Styling
 .slider {
     display: flex;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
-    background: white;
-    margin-bottom: 10px;
-    height: $sliderHeight;
+    height: 100%;
+
 
     &::before,
     &::after {
-        @include white-gradient;
-        content: "";
-        height: $sliderHeight;
+        // @include white-gradient;
+        // content: "";
+        height: 100%;
         position: absolute;
         width: calc(2* $slideWidth);
         z-index: 2;
     }
 
     &::after {
+        @include right-gradient;
+        content: "";
         right: 0;
         top: 0;
         transform: rotateZ(180deg);
     }
 
     &::before {
+        @include left-gradient;
+        content: "";
         left: 0;
         top: 0;
     }
@@ -173,29 +184,30 @@ $slideWidth: 100px;
         width: calc($slideWidth * $numberOfExhanges);
 
         .slide {
-            height: $sliderHeight;
+
             width: $slideWidth;
-            line-height: 25px;
+            line-height: 15px;
             text-align: center;
 
             h1 {
-                font-size: 25px;
-                margin: 0;
-                padding: 0;
+                font-size: 20px;
+
             }
 
             h2 {
-                font-size: 20px;
+                font-size: 15px;
+
             }
 
             .open {
-                background-color: #5df542;
-                font-size: 20px;
+                background-color: #7eff68fd;
+                font-size: 15px;
+
             }
 
             .close {
-                background-color: #ed2424;
-                font-size: 20px;
+                background-color: #ff6262;
+                font-size: 15px;
             }
         }
     }
