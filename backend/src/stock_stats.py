@@ -79,7 +79,7 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
 
     annualized_volatility: float = evaluate_annualized_volatility(data)
 
-    json_stats: Dict[str, Dict[str, float]] = {
+    json_stats: Dict[str, Dict[str, float | str]] = {
         "symbol": symbol,
         "cumulativeReturn": cumulative_return,
         "annualizedCumulativeReturn": annualized_cumulative_return,
@@ -89,7 +89,7 @@ def evaluate_stats_information(data: pd.Series, symbol: str) -> Dict[str, float 
     return json_stats
 
 
-def evaluate_cumulative_return(data: pd.Series) -> float:
+def evaluate_cumulative_return(data: pd.Series) -> float | str:
     """Evaluate the cumulative return of a series in percent.
 
     Lets write P_initial the initial value of our series,
@@ -114,7 +114,7 @@ def evaluate_cumulative_return(data: pd.Series) -> float:
         data = data.sort_index()
 
     if len(data) < 2:
-        cumulative_return = np.nan
+        cumulative_return = "-"
 
     else:
         cumulative_return: float = (data[-1] - data[-2]) / data[-2] * 100
@@ -152,7 +152,7 @@ def evaluate_annualized_return(data: pd.Series, n_years: int) -> float:
 
     if data_n_years_ago.empty:
         # Stock price is not long enough to evaluate the annualized return for this n_years
-        annualized_cumulative_return = np.nan
+        annualized_cumulative_return = "-"
 
     else:
         stock_price_n_years_ago = data_n_years_ago[-1]
