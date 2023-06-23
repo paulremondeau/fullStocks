@@ -531,7 +531,6 @@ def update_symbol_data(symbol: str):
                         description: The error message associated.
     """
     time_delta: str = request.args.get("timeDelta", type=str)
-    
     if time_delta not in DELTA_CHOICES:
         return {
             "message": f'Incorrect time delta, should be within {", ".join(DELTA_CHOICES)}'
