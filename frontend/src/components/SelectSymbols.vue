@@ -1,5 +1,4 @@
 <template>
-    >
     <VueMultiselect v-model="selectedSymbols" :options="options" :multiple="true" :close-on-select="false"
         placeHolder="Select symbols">
     </VueMultiselect>

@@ -128,7 +128,7 @@ def check_twelvedata_api_response(response: requests.Response) -> Dict[str, str 
 
 @handle_exception
 def get_stock_timeseries(
-    symbol: str, api_key: str
+    symbol: str, time_delta: str, api_key: str
 ) -> Dict[str, str | int | pd.DataFrame]:
     """Request the twelve data API for stock informations.
 
@@ -187,6 +187,7 @@ def get_stock_timeseries(
     params = copy(twelvedata_api_config["timeseries_params"])
     params["symbol"] = symbol
     params["apikey"] = api_key
+    params["interval"] = time_delta
     response = requests.get(twelvedata_api_config["timeseries_url"], params=params)
 
     response_json = check_twelvedata_api_response(response)

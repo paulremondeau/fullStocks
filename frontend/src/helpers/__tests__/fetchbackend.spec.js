@@ -20,7 +20,7 @@ describe('fetchBackend', () => {
 
 
         fetchBackend("market", "get").then(response => {
-            console.log(response)
+
             expect(response).toStrictEqual(data)
         })
     })

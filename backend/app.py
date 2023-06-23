@@ -115,12 +115,21 @@ COUNTRY_LENGTH = 30
 
 class StockTimeSeries(db.Model):
     symbol = db.Column(db.String(SYMBOL_LENGTH), primary_key=True)
+    timeDelta = db.Column(db.String(6), primary_key=True)
     exchange = db.Column(db.String(EXCHANGE_LENGTH))
     timezone = db.Column(db.String(100))
-    timeseries = db.Column(db.PickleType())
+    timeseries = db.Column(db.PickleType(comparator=pd.Series.equals))
 
-    def __init__(self, symbol, exchange, timezone, timeseries):
+    def __init__(
+        self,
+        symbol,
+        timeDelta,
+        exchange,
+        timezone,
+        timeseries,
+    ):
         self.symbol = symbol
+        self.timeDelta = timeDelta
         self.exchange = exchange
         self.timezone = timezone
         self.timeseries = timeseries
@@ -128,7 +137,13 @@ class StockTimeSeries(db.Model):
 
 class StockTimeSeriesSchema(ma.Schema):
     class Meta:
-        fields = ("symbol", "exchange", "timezone", "timeseries")
+        fields = (
+            "symbol",
+            "timeDelta",
+            "exchange",
+            "timezone",
+            "timeseries",
+        )
 
 
 stock_timeseries_schema = StockTimeSeriesSchema()
@@ -287,16 +302,6 @@ def create_symbol_data():
     tags:
         - SYMBOLS
 
-    requestBody:
-        description: The parameter of the request.
-        required: true
-        schema:
-            type: object
-            properties:
-                symbol:
-                    type: string
-                    description: The symbol we want to add to the database.
-
     parameters:
         - name: body
           in: body
@@ -307,6 +312,9 @@ def create_symbol_data():
                 symbol:
                     type: string
                     description: The symbol we want to add to the database.
+                timeDelta:
+                    type: string
+                    description: The desired time delta for the data.
 
     responses:
         200:
@@ -329,24 +337,32 @@ def create_symbol_data():
                         description: The error message associated.
     """
     requests_body = json.loads(request.data)
+    try:
+        symbol = requests_body["symbol"]
+        time_delta = requests_body["timeDelta"]
+    except KeyError:
+        return {
+            "message": "Body format wrong, should be {'symbol': 'abc', 'timeDelta': 'abc}"
+        }, 400
 
-    symbol = requests_body["symbol"]
-
-    if db.session.get(StockTimeSeries, symbol) is not None:
+    if db.session.get(StockTimeSeries, [symbol, time_delta]) is not None:
         # Data already exist
-        return {"message": f"Data already exists, use GET /symbols/{symbol}"}, 200
+        return {
+            "message": f"Data already exists, use GET /symbols/{symbol}?timeDelta={time_delta}"
+        }, 200
 
         # return {"message": f"Data already exists, use /symbols/{symbol}"}, 409
 
     else:
         # Data does not exists
         result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
-            symbol, API_KEY
+            symbol, time_delta, API_KEY
         )
 
         if result_from_twelve_data["status"] == "ok":
             new_timeseries = StockTimeSeries(
                 symbol,
+                time_delta,
                 exchange=result_from_twelve_data["exchange"],
                 timezone=result_from_twelve_data["timezone"],
                 timeseries=result_from_twelve_data["data"],
@@ -355,7 +371,9 @@ def create_symbol_data():
             db.session.add(new_timeseries)
             db.session.commit()
 
-            return {"message": f"Data created, use GET /symbols/{symbol}"}, 201
+            return {
+                "message": f"Data created, use GET /symbols/{symbol}?timeDelta={time_delta}"
+            }, 201
         else:
             return result_from_twelve_data, 500
 
@@ -375,6 +393,12 @@ def get_symbol_data(symbol: str):
             type: string
           required: true
           description: The symbol we want to retrieve data from the database.
+        - in: query
+          name: timeDelta
+          schema:
+              type: string
+          required: true
+          description: The time interval we want for the data.
     responses:
         200:
             description: Request successful, returning the symbol data from database and the evaluated stats infomartions.
@@ -425,10 +449,9 @@ def get_symbol_data(symbol: str):
         204:
             description: Data does not exist in database, you can create it through the POST /symbols
     """
-    target_data_format: str = request.args.get("dataFormat", default="", type=str)
-    localize: bool = request.args.get("localize", default=False, type=json.loads)
+    time_delta: str = request.args.get("timeDelta", type=str)
 
-    data = db.session.get(StockTimeSeries, symbol)
+    data = db.session.get(StockTimeSeries, [symbol, time_delta])
     if data is None:
         # Data does not exist
         return {}, 204
@@ -469,6 +492,12 @@ def update_symbol_data(symbol: str):
             type: string
           required: true
           description: The symbol we want to update data in the database.
+        - in: query
+          name: timeDelta
+          schema:
+              type: string
+          required: true
+          description: The time interval we want for the data.
     responses:
         200:
             description: The data was successfully updated, you can get it back with get request.
@@ -499,15 +528,15 @@ def update_symbol_data(symbol: str):
                         description: The associated error code.
                     message:
                         type: string
-                        description: The error messaeg associated.
+                        description: The error message associated.
     """
-    max_delta = request.args.get("maxDelta", default="1day", type=str)
-    if max_delta not in DELTA_CHOICES:
+    time_delta: str = request.args.get("timeDelta", type=str)
+    if time_delta not in DELTA_CHOICES:
         return {
             "message": f'Incorrect time delta, should be within {", ".join(DELTA_CHOICES)}'
         }, 400
 
-    old_data = db.session.get(StockTimeSeries, symbol)
+    old_data = db.session.get(StockTimeSeries, [symbol, time_delta])
     if old_data is None:
         # Data does not exist
         return {}, 204
@@ -516,22 +545,18 @@ def update_symbol_data(symbol: str):
         # Check if data is fresh enough
         timezone = old_data.timezone
         tz = pytz.timezone(timezone)
-        delta_size = int(re.findall("\d+", max_delta)[0])
-        delta_unit = convert_delta_unit[re.findall("\D+", max_delta)[0]]
+        delta_size = int(re.findall("\d+", time_delta)[0])
+        delta_unit = convert_delta_unit[re.findall("\D+", time_delta)[0]]
 
-        time_delta = datetime.datetime.now(tz=tz) - tz.localize(
+        data_time_delta = datetime.datetime.now(tz=tz) - tz.localize(
             old_data.timeseries.index[-1]
         )
 
-        print(datetime.datetime.now(tz=tz))
-
-        print(tz.localize(old_data.timeseries.index[-1]))
-
-        if time_delta < datetime.timedelta(**{delta_unit: delta_size}):
+        if data_time_delta < datetime.timedelta(**{delta_unit: delta_size}):
             # if True:
             # Data is fresh enough
             logger.warning(
-                f"Last data point is younger than {delta_size} {delta_unit}, no new data available. Last data is {time_delta} old."
+                f"Last data point is younger than {delta_size} {delta_unit}, no new data available. Last data is {data_time_delta} old."
             )
             return {}, 304
 
@@ -549,14 +574,15 @@ def update_symbol_data(symbol: str):
 
             else:
                 result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
-                    symbol, API_KEY
+                    symbol, time_delta, API_KEY
                 )
                 if result_from_twelve_data["status"] == "ok":
                     old_data.timeseries = result_from_twelve_data["data"]
+
                     db.session.commit()
 
                     return {
-                        "message": f"Data successfully updated, use GET /symbols/{symbol}"
+                        "message": f"Data successfully updated, use GET /symbols/{symbol}?timeDelta={time_delta}"
                     }, 200
 
                 else:

@@ -55,7 +55,7 @@ def test_request_stock_time_series(requests_mock):
     api_response = {"status": "error", "code": 400, "message": "foo"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
 
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "status": "error",
         "code": 400,
         "message": "foo",
@@ -72,7 +72,7 @@ def test_request_stock_time_series(requests_mock):
 
     api_response = {"meta": meta, "values": values, "status": "ok"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "code": 500,
         "message": "value of key 'foo' of dict is not an instance of str",
         "status": "error",
@@ -87,7 +87,7 @@ def test_request_stock_time_series(requests_mock):
     values = [[]]
     api_response = {"meta": meta, "values": values, "status": "ok"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "code": 500,
         "message": "item 0 of list is not a dict",
         "status": "error",
@@ -96,7 +96,7 @@ def test_request_stock_time_series(requests_mock):
     values = [{"datetime": 123456789}]
     api_response = {"meta": meta, "values": values, "status": "ok"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "code": 500,
         "message": "value of key 'datetime' of item 0 of list is not an instance of str",
         "status": "error",
@@ -122,7 +122,7 @@ def test_request_stock_time_series(requests_mock):
 
     api_response = {"meta": meta, "values": values, "status": "ok"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "status": "error",
         "code": 500,
         "message": "Meta data are not correct, check Twelve Data API",
@@ -142,7 +142,7 @@ def test_request_stock_time_series(requests_mock):
     values = []
     api_response = {"meta": meta, "values": values, "status": "ok"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "status": "error",
         "code": 500,
         "message": "Data value is empty, check Twelve Data API",
@@ -174,7 +174,7 @@ def test_request_stock_time_series(requests_mock):
     ]
     api_response = {"meta": meta, "values": values, "status": "ok"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "status": "error",
         "code": 500,
         "message": "Data value keys are not always the same, check Twelve Data API",
@@ -196,7 +196,7 @@ def test_request_stock_time_series(requests_mock):
     ]
     api_response = {"meta": meta, "values": values, "status": "ok"}
     requests_mock.get(twelvedata_api_config["timeseries_url"], json=api_response)
-    assert get_stock_timeseries("foo", "foo") == {
+    assert get_stock_timeseries("foo", "foo", "foo") == {
         "status": "error",
         "code": 500,
         "message": "Data value keys are not the expected ones, check Twelve Data API",
@@ -253,7 +253,7 @@ def test_request_stock_time_series(requests_mock):
         dtype="float64",
     )
 
-    result = get_stock_timeseries("foo", "foo")
+    result = get_stock_timeseries("foo", "foo", "foo")
     assert set(result.keys()) == {"status", "exchange", "timezone", "data"}
     print(result)
 
