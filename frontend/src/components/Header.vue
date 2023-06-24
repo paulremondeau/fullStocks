@@ -22,7 +22,11 @@ import MarketState from "./MarketState.vue"
 
 onMounted(() => {
     fetchBackend("market", "post")
-        .then(newData => assignMarketData(newData))
+        .then((newData) => {
+            if (newData.status == "ok") {
+                assignMarketData(newData.data)
+            }
+        })
         .catch((error) => {
             console.log(error)
         })

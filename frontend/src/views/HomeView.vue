@@ -35,7 +35,6 @@
       <h1>Statistical informations</h1>
       <StatsTable :tableData="dataStatsTable" />
     </div>
-
   </div>
 </template>
 
@@ -51,6 +50,7 @@ import StatsTable from '../components/StatsTable.vue'
 import SelectSymbols from '../components/SelectSymbols.vue'
 
 const timeDeltas = ["1min", "5min", "15min", "30min", "45min", "1h", "2h", "4h", "1day", "1week", "1month"]
+let controller = new AbortController();
 
 ///// States /////
 const dataStatsTable = ref([])
@@ -71,21 +71,27 @@ onMounted(() => {
   // For now, all symbols at once
   // TODO : make lists per exchange market
   // availableSymbols.value = newData
-  fetchBackend("symbols-list", 'get')
+  fetchBackend("symbols-list", 'get', controller)
     .then((newData) => {
-      availableSymbols.value = newData.map(x => x.symbolsList).flat()
+      if (newData.status == "ok") {
+        availableSymbols.value = newData.data.map(x => x.symbolsList).flat()
+      }
+
     }).catch((error) => {
       console.log(error)
     })
 })
 
 function initTimeSeries() {
+
   for (let symbol of selectedSymbols.value) {
 
-    fetchBackend("symbols/" + symbol, 'put', {}, { "timeDelta": chosenTimeDelta.value, performance: showPerformance.value })
+    fetchBackend("symbols/" + symbol, 'put', controller, {}, { "timeDelta": chosenTimeDelta.value, performance: showPerformance.value })
       .then((symbolData) => {
+        if (symbolData.status == "ok") {
+          processApiResult(symbolData.data)
+        }
 
-        processApiResult(symbolData)
       }).catch((error) => {
         console.log(error)
       })
@@ -113,9 +119,13 @@ function updateSymbols(newSymbols) {
   if (selectedSymbols.value.length < newSymbols.value.length) {
     // Get the different symbol
     const addedSymbol = newSymbols.value.filter(x => !selectedSymbols.value.includes(x))[0]
-    fetchBackend("symbols/" + addedSymbol, 'put', {}, { "timeDelta": timeDelta, performance: showPerformance.value }).then(symbolData => processApiResult(symbolData, timeDelta))
-
-    selectedSymbols.value.push(addedSymbol)
+    fetchBackend("symbols/" + addedSymbol, 'put', controller, {}, { "timeDelta": timeDelta, performance: showPerformance.value })
+      .then((symbolData) => {
+        if (symbolData.status == "ok") {
+          processApiResult(symbolData.data, timeDelta)
+        }
+      }
+      ).finally(selectedSymbols.value.push(addedSymbol))
   }
 
 
@@ -141,8 +151,18 @@ function processApiResult(symbolData) {
   }
 }
 
-watch(chosenTimeDelta, initTimeSeries)
-watch(showPerformance, initTimeSeries)
+watch(chosenTimeDelta, async () => {
+  controller.abort()
+  controller = new AbortController();
+  initTimeSeries()
+}
+)
+watch(showPerformance, async () => {
+  controller.abort()
+  controller = new AbortController();
+  initTimeSeries()
+}
+)
 
 </script>
 
