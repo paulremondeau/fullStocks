@@ -7,7 +7,7 @@
         </div>
         <!-- <div class="logo"></div> -->
         <a href="https://paulremondeau.github.io">
-            <img src="../assets/github.svg" class="logo" />
+            <img src="../assets/github.svg" class="logo" target="_blank" rel="noopener noreferrer" />
         </a>
     </div>
 </template>
@@ -66,10 +66,22 @@ function assignMarketData(data) {
         width: 87vw
     }
 
-    img.logo {
+    a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         margin-right: 10px;
-    }
 
+        transition-property: none;
+        pointer-events: stroke;
+
+        &:hover {
+            background-color: transparent;
+
+        }
+
+
+    }
 
 }
 </style>
