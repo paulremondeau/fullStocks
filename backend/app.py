@@ -399,6 +399,12 @@ def get_symbol_data(symbol: str):
               type: string
           required: true
           description: The time interval we want for the data.
+        - in: query
+          name: performance
+          schema:
+              type: boolean
+          required: true
+          description: To format to performance or keep raw value.
     responses:
         200:
             description: Request successful, returning the symbol data from database and the evaluated stats infomartions.
@@ -406,29 +412,15 @@ def get_symbol_data(symbol: str):
                 type: object
                 properties:
                     timeseries:
-                        type: object
-                        description: Performance and value timeseries.
-                        properties:
-                            performance:
-                                type: array
-                                description: Performance timeseries.
-                                items:
-                                    type: array
-                                    items:
-                                        type: number
-                                        description: A data point (time and value).
-                                    minItems: 2
-                                    maxItems: 2
-                            values:
-                                type: array
-                                description: Value timeseries.
-                                items:
-                                    type: array
-                                    items:
-                                        type: number
-                                        description: A data point (time and value).
-                                    minItems: 2
-                                    maxItems: 2
+                        type: array
+                        description: Timeseries, either performance or raw value.
+                        items:
+                            type: array
+                            items:
+                                type: number
+                                description: A data point (time and value).
+                            minItems: 2
+                            maxItems: 2
                     stats:
                         type: object
                         description: The stats informations of the stock.
@@ -450,6 +442,7 @@ def get_symbol_data(symbol: str):
             description: Data does not exist in database, you can create it through the POST /symbols
     """
     time_delta: str = request.args.get("timeDelta", type=str)
+    performance: bool = json.loads(request.args.get("performance"))
 
     data = db.session.get(StockTimeSeries, [symbol, time_delta])
     if data is None:
@@ -459,21 +452,15 @@ def get_symbol_data(symbol: str):
     else:
         database_data = stock_timeseries_schema.dump(data)
 
-        data_result = dict()
-
         stats_table = stock_stats.evaluate_stats_information(
             database_data["timeseries"], symbol
         )
 
-        data_result["performance"] = utils.series_to_apexcharts(
-            database_data["timeseries"], performance=True
+        timeseries = utils.series_to_apexcharts(
+            database_data["timeseries"], performance=performance
         )
 
-        data_result["values"] = utils.series_to_apexcharts(
-            database_data["timeseries"], performance=False
-        )
-
-        return {"timeseries": data_result, "stats": stats_table}, 200
+        return {"timeseries": timeseries, "stats": stats_table}, 200
 
 
 # TODO : market is closed but new data is available (delta > 2* chosen delta) -> modify this !!
@@ -548,10 +535,14 @@ def update_symbol_data(symbol: str):
         delta_size = int(re.findall("\d+", time_delta)[0])
         delta_unit = convert_delta_unit[re.findall("\D+", time_delta)[0]]
 
+        if delta_unit == "months":
+            delta_unit = "days"
+            delta_size *= 30
+
         data_time_delta = datetime.datetime.now(tz=tz) - tz.localize(
             old_data.timeseries.index[-1]
         )
-
+        print(delta_unit, delta_size)
         if data_time_delta < datetime.timedelta(**{delta_unit: delta_size}):
             # if True:
             # Data is fresh enough

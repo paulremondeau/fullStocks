@@ -29,9 +29,7 @@
           </ul>
         </div>
       </div>
-      <LineChart :dataLineChart="showPerformance
-        ? dataLineChartPerformance[chosenTimeDelta]
-        : dataLineChartValue[chosenTimeDelta]" />
+      <LineChart :dataLineChart="dataLineChart" />
     </div>
     <div class="statsTable">
       <h1>Statistical informations</h1>
@@ -41,9 +39,7 @@
 </template>
 
 <script setup>
-
-// TODO : maybe change data to store only the shown graph, to reduce memory client side (thus call backend everytime performance/value change or timeDelta change)
-import { reactive, ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 
 import { fetchBackend } from '../helpers/fetchbackend'
 import { updateChartData } from '../helpers/utils'
@@ -54,13 +50,11 @@ import StatsTable from '../components/StatsTable.vue'
 import SelectSymbols from '../components/SelectSymbols.vue'
 
 const timeDeltas = ["1min", "5min", "15min", "30min", "45min", "1h", "2h", "4h", "1day", "1week", "1month"]
+let controller = new AbortController();
 
 ///// States /////
 const dataStatsTable = ref([])
-const dataLineChartPerformance = reactive(Object.fromEntries(timeDeltas.map(i => [i, []])))
-const dataLineChartValue = reactive(Object.fromEntries(timeDeltas.map(i => [i, []])))
-const marketData = reactive([])
-// TODO : make it a ref and update it in props (computed return read-only, that's why...)
+const dataLineChart = ref([])
 const selectedSymbols = ref(['AAPL', 'MSFT', 'META'])
 const availableSymbols = ref([])
 const showPerformance = ref(true)
@@ -77,21 +71,27 @@ onMounted(() => {
   // For now, all symbols at once
   // TODO : make lists per exchange market
   // availableSymbols.value = newData
-  fetchBackend("symbols-list", 'get')
+  fetchBackend("symbols-list", 'get', controller)
     .then((newData) => {
-      availableSymbols.value = newData.map(x => x.symbolsList).flat()
+      if (newData.status == "ok") {
+        availableSymbols.value = newData.data.map(x => x.symbolsList).flat()
+      }
+
     }).catch((error) => {
       console.log(error)
     })
 })
 
 function initTimeSeries() {
+
   for (let symbol of selectedSymbols.value) {
 
-    fetchBackend("symbols/" + symbol, 'put', {}, { "timeDelta": chosenTimeDelta.value })
+    fetchBackend("symbols/" + symbol, 'put', controller, {}, { "timeDelta": chosenTimeDelta.value, performance: showPerformance.value })
       .then((symbolData) => {
+        if (symbolData.status == "ok") {
+          processApiResult(symbolData.data)
+        }
 
-        processApiResult(symbolData, chosenTimeDelta.value)
       }).catch((error) => {
         console.log(error)
       })
@@ -111,8 +111,7 @@ function updateSymbols(newSymbols) {
     const removedSymbol = selectedSymbols.value.filter(x => !newSymbols.value.includes(x))[0]
     selectedSymbols.value = selectedSymbols.value.filter(x => x != removedSymbol)
 
-    dataLineChartValue[timeDelta] = dataLineChartValue[timeDelta].filter(x => x.name != removedSymbol)
-    dataLineChartPerformance[timeDelta] = dataLineChartPerformance[timeDelta].filter(x => x.name != removedSymbol)
+    dataLineChart.value = dataLineChart.value.filter(x => x.name != removedSymbol)
     dataStatsTable.value = dataStatsTable.value.filter(x => x.symbol != removedSymbol)
   }
 
@@ -120,9 +119,13 @@ function updateSymbols(newSymbols) {
   if (selectedSymbols.value.length < newSymbols.value.length) {
     // Get the different symbol
     const addedSymbol = newSymbols.value.filter(x => !selectedSymbols.value.includes(x))[0]
-    fetchBackend("symbols/" + addedSymbol, 'put', {}, { "timeDelta": timeDelta }).then(symbolData => processApiResult(symbolData, timeDelta))
-
-    selectedSymbols.value.push(addedSymbol)
+    fetchBackend("symbols/" + addedSymbol, 'put', controller, {}, { "timeDelta": timeDelta, performance: showPerformance.value })
+      .then((symbolData) => {
+        if (symbolData.status == "ok") {
+          processApiResult(symbolData.data, timeDelta)
+        }
+      }
+      ).finally(selectedSymbols.value.push(addedSymbol))
   }
 
 
@@ -133,12 +136,11 @@ function updateSymbols(newSymbols) {
  * Add API results to state.
  * @param {Object} res The results from the backend API.
  */
-function processApiResult(symbolData, timeDelta) {
+function processApiResult(symbolData) {
 
   let symbol = symbolData.stats.symbol
 
-  updateChartData(dataLineChartPerformance[timeDelta], symbol, symbolData.timeseries.performance)
-  updateChartData(dataLineChartValue[timeDelta], symbol, symbolData.timeseries.values)
+  updateChartData(dataLineChart.value, symbol, symbolData.timeseries)
 
 
   let indexData = dataStatsTable.value.findIndex((item) => item.symbol == symbol)
@@ -149,7 +151,18 @@ function processApiResult(symbolData, timeDelta) {
   }
 }
 
-watch(chosenTimeDelta, initTimeSeries)
+watch(chosenTimeDelta, async () => {
+  controller.abort()
+  controller = new AbortController();
+  initTimeSeries()
+}
+)
+watch(showPerformance, async () => {
+  controller.abort()
+  controller = new AbortController();
+  initTimeSeries()
+}
+)
 
 </script>
 
