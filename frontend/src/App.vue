@@ -4,6 +4,7 @@ import Header from './components/Header.vue'
 </script>
 
 <template>
+  <notifications position="bottom right" ignoreDuplicates=true group="Error" />
   <div class="app">
     <div class="header">
       <Header />

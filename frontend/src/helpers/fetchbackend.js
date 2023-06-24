@@ -1,34 +1,43 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import apiUrl from "../../config";
+
+import { useNotification } from "@kyvg/vue3-notification";
+const { notify } = useNotification()
 
 const availableEndpoints = ["market", "symbols", "symbols-list"]
 
-function fetchBackend(endpoint, method, data = {}, params = {}) {
+function fetchBackend(endpoint, method, controller, data = {}, params = {}) {
+
+    if (controller == undefined) {
+        controller = new AbortController();
+    }
+
 
     return axios({
         method: method,
         url: apiUrl + endpoint,
         data: data,
-        params: params
+        params: params,
+        signal: controller.signal
     }).then((res) => {
 
         switch (method) {
             case 'get':
                 switch (res.status) {
                     case 200:
-                        return res.data
+                        return { "data": res.data, "status": "ok" }
                     case 204:
                         // Data does not exists
-                        return fetchBackend(endpoint, 'post', {}, params)
+                        return fetchBackend(endpoint, 'post', controller, {}, params)
                 }
 
             case 'post':
                 // Data either already exists or was created, get it anyway
                 if (Object.keys(data).includes("symbol")) {
                     // Symbol was created, must update endpoint to get it
-                    return fetchBackend(endpoint + "/" + data.symbol, 'get', data, params)
+                    return fetchBackend(endpoint + "/" + data.symbol, controller, 'get', data, params)
                 } else {
-                    return fetchBackend(endpoint, 'get', data, params)
+                    return fetchBackend(endpoint, 'get', controller, data, params)
                 }
 
 
@@ -36,7 +45,7 @@ function fetchBackend(endpoint, method, data = {}, params = {}) {
                 switch (res.status) {
                     case 200:
                         // Data successfully updated, now get it
-                        return fetchBackend(endpoint, 'get', data, params)
+                        return fetchBackend(endpoint, 'get', controller, data, params)
                     case 204:
                         // Data does not exist
                         // TODO : not convenient, should not change endpoint -> change the backend endpoints ?
@@ -44,7 +53,7 @@ function fetchBackend(endpoint, method, data = {}, params = {}) {
                             // Trying to update a specific data symbol
                             // Post method is not at same endpoint (dumb idea...)
 
-                            return fetchBackend("symbols", 'post', { symbol: endpoint.substring(8), timeDelta: params.timeDelta }, params)
+                            return fetchBackend("symbols", 'post', controller, { symbol: endpoint.substring(8), timeDelta: params.timeDelta }, params)
                         } else { return fetchBackend(endpoint, 'post') }
 
                 }
@@ -52,18 +61,30 @@ function fetchBackend(endpoint, method, data = {}, params = {}) {
 
 
     }).catch((error) => {
-
-        // Not Modified error
-        if (error.response.status == 304) {
-            return fetchBackend(endpoint, 'get', data, params)
-        } else if (error.response.status == 500) {
-            console.log("Erreur 500")
+        if (error.code == "ERR_CANCELED") {
+            return { "status": "error" }
         } else {
-            throw AxiosError
-        }
+            // Not Modified error
+            if (error.response.status == 304) {
+                return fetchBackend(endpoint, 'get', controller, data, params)
+            } else if (error.response.status == 500) {
+                notify({
+                    title: "⚠️ " + error.response.data.message,
+                    group: 'Error',
+                    type: 'error',
+                });
+                return { "status": "error" }
+            } else {
+                return { "status": "error" }
+            }
 
+        }
     })
 
 }
 
+
 export { fetchBackend }
+
+
+

@@ -9,6 +9,7 @@
     "test:unit": "vitest --ui"
   },
   "dependencies": {
+    "@kyvg/vue3-notification": "^2.9.1",
     "apexcharts": "^3.41.0",
     "axios": "^1.4.0",
     "luxon": "^3.3.0",

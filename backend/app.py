@@ -535,10 +535,14 @@ def update_symbol_data(symbol: str):
         delta_size = int(re.findall("\d+", time_delta)[0])
         delta_unit = convert_delta_unit[re.findall("\D+", time_delta)[0]]
 
+        if delta_unit == "months":
+            delta_unit = "days"
+            delta_size *= 30
+
         data_time_delta = datetime.datetime.now(tz=tz) - tz.localize(
             old_data.timeseries.index[-1]
         )
-
+        print(delta_unit, delta_size)
         if data_time_delta < datetime.timedelta(**{delta_unit: delta_size}):
             # if True:
             # Data is fresh enough
