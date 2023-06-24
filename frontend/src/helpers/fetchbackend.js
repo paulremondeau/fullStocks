@@ -56,6 +56,8 @@ function fetchBackend(endpoint, method, data = {}, params = {}) {
         // Not Modified error
         if (error.response.status == 304) {
             return fetchBackend(endpoint, 'get', data, params)
+        } else if (error.response.status == 500) {
+            console.log("Erreur 500")
         } else {
             throw AxiosError
         }
