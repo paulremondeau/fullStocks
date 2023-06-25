@@ -43,3 +43,4 @@ backend/docs/sphinx
 backend/docs/build
 
 backend/old_app.py
+*.drawio
