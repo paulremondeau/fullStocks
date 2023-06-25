@@ -126,7 +126,7 @@ def series_to_apexcharts(
     >>> series_to_apexcharts(timeseries, performance = True)
     [[1672531200000, 100.0], [1672704000000, 33.33], [1672617600000, 66.67]]
     """
-    # print(timeseries)
+
     result = deepcopy(timeseries)
 
     if timeseries is None:

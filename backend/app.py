@@ -542,7 +542,7 @@ def update_symbol_data(symbol: str):
         data_time_delta = datetime.datetime.now(tz=tz) - tz.localize(
             old_data.timeseries.index[-1]
         )
-        print(delta_unit, delta_size)
+
         if data_time_delta < datetime.timedelta(**{delta_unit: delta_size}):
             # if True:
             # Data is fresh enough
