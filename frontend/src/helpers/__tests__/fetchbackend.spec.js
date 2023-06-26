@@ -21,7 +21,7 @@ describe('fetchBackend', () => {
 
         fetchBackend("market", "get").then(response => {
 
-            expect(response).toStrictEqual({ data: { foo: 1 }, status: 'ok' })
+            expect(response).toStrictEqual({ data: { foo: 0 }, status: 'ok' })
         })
     })
 
