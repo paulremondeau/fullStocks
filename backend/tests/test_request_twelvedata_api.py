@@ -254,8 +254,7 @@ def test_request_stock_time_series(requests_mock):
     )
 
     result = get_stock_timeseries("foo", "foo", "foo")
-    assert set(result.keys()) == {"status", "exchange", "timezone", "data"}
-    
+    assert set(result.keys()) == {"status", "exchange", "timezone", "dat"}
 
     result_status = result["status"]
     assert result_status == "ok"
