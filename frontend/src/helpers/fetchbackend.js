@@ -6,6 +6,15 @@ const { notify } = useNotification()
 
 const availableEndpoints = ["market", "symbols", "symbols-list"]
 
+/**
+ * Fetch backend for data.
+ * @param {string} endpoint 
+ * @param {string} method 
+ * @param {*} controller Allows interruption if requests is not needed anymore
+ * @param {object} data The form parameters
+ * @param {object} params The query parameters
+ * @returns {Promise} The promise results, allowing async usage
+ */
 function fetchBackend(endpoint, method, controller, data = {}, params = {}) {
 
     if (controller == undefined) {

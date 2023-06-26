@@ -73,14 +73,6 @@ def handle_exception(func):
     {'status': 'error', 'code': 500, 'message': 'Erreur'}
     >>> foo(raise_exception=False)
     'Nothing happened'
-
-    Now, let's raise the exception from foo() :
-
-
-
-    Finally, let's see what happens when no exception is raised :
-
-
     """
 
     @functools.wraps(func)
