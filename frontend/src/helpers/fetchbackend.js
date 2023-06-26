@@ -13,7 +13,7 @@ const availableEndpoints = ["market", "symbols", "symbols-list"]
  * @param {*} controller Allows interruption if requests is not needed anymore
  * @param {object} data The form parameters
  * @param {object} params The query parameters
- * @returns {Promise} The promise results, allowing async usage
+ * @returns {Promise} The promise result, allowing async usage
  */
 function fetchBackend(endpoint, method, controller, data = {}, params = {}) {
 
