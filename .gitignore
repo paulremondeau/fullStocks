@@ -37,6 +37,7 @@ __pycache__
 .venv
 *.ipynb
 config.*
+*.coverage
 
 ## Sphinx
 backend/docs/sphinx
