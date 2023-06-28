@@ -119,20 +119,17 @@ class StockTimeSeries(db.Model):
     exchange = db.Column(db.String(EXCHANGE_LENGTH))
     timezone = db.Column(db.String(100))
     timeseries = db.Column(db.PickleType(comparator=pd.Series.equals))
+    marketChecked = db.Column(db.Boolean)
 
     def __init__(
-        self,
-        symbol,
-        timeDelta,
-        exchange,
-        timezone,
-        timeseries,
+        self, symbol, timeDelta, exchange, timezone, timeseries, marketChecked
     ):
         self.symbol = symbol
         self.timeDelta = timeDelta
         self.exchange = exchange
         self.timezone = timezone
         self.timeseries = timeseries
+        self.marketChecked = marketChecked
 
 
 class StockTimeSeriesSchema(ma.Schema):
@@ -143,6 +140,7 @@ class StockTimeSeriesSchema(ma.Schema):
             "exchange",
             "timezone",
             "timeseries",
+            "marketChecked",
         )
 
 
@@ -360,12 +358,21 @@ def create_symbol_data():
         )
 
         if result_from_twelve_data["status"] == "ok":
+            exchange = result_from_twelve_data["exchange"]
+            market_check = False
+            market_data = db.session.get(MarketState, exchange)
+
+            if market_data is not None:
+                if market_data.isMarketOpen:
+                    market_check = True
+
             new_timeseries = StockTimeSeries(
                 symbol,
                 time_delta,
                 exchange=result_from_twelve_data["exchange"],
                 timezone=result_from_twelve_data["timezone"],
                 timeseries=result_from_twelve_data["data"],
+                marketChecked=False,
             )
 
             db.session.add(new_timeseries)
@@ -560,24 +567,37 @@ def update_symbol_data(symbol: str):
 
             if not exchange_data.isMarketOpen:
                 # Market is close
-                logger.warning(f"{old_data.exchange} is closed, no new data available.")
-                return {}, 304
 
-            else:
-                result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
-                    symbol, time_delta, API_KEY
-                )
-                if result_from_twelve_data["status"] == "ok":
-                    old_data.timeseries = result_from_twelve_data["data"]
-
-                    db.session.commit()
-
-                    return {
-                        "message": f"Data successfully updated, use GET /symbols/{symbol}?timeDelta={time_delta}"
-                    }, 200
+                if not old_data.marketChecked:
+                    logger.info(
+                        f"{old_data.exchange} is closed, we verify one time for potential new data."
+                    )
+                    # Check at least one time because new data may have arrived
+                    old_data.marketChecked = True
 
                 else:
-                    return result_from_twelve_data, 500
+                    logger.warning(
+                        f"{old_data.exchange} is closed and verified, no new data available."
+                    )
+                    return {}, 304
+
+            else:
+                old_data.marketChecked = False
+
+            result_from_twelve_data = request_twelvedata_api.get_stock_timeseries(
+                symbol, time_delta, API_KEY
+            )
+            if result_from_twelve_data["status"] == "ok":
+                old_data.timeseries = result_from_twelve_data["data"]
+
+                db.session.commit()
+
+                return {
+                    "message": f"Data successfully updated, use GET /symbols/{symbol}?timeDelta={time_delta}"
+                }, 200
+
+            else:
+                return result_from_twelve_data, 500
 
 
 @app.route("/market", methods=["GET"])

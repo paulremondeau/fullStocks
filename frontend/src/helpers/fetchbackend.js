@@ -21,7 +21,6 @@ function fetchBackend(endpoint, method, controller, data = {}, params = {}) {
         controller = new AbortController();
     }
 
-
     return axios({
         method: method,
         url: apiUrl + endpoint,
@@ -44,7 +43,7 @@ function fetchBackend(endpoint, method, controller, data = {}, params = {}) {
                 // Data either already exists or was created, get it anyway
                 if (Object.keys(data).includes("symbol")) {
                     // Symbol was created, must update endpoint to get it
-                    return fetchBackend(endpoint + "/" + data.symbol, controller, 'get', data, params)
+                    return fetchBackend(endpoint + "/" + data.symbol, 'get', controller, data, params)
                 } else {
                     return fetchBackend(endpoint, 'get', controller, data, params)
                 }
@@ -70,6 +69,7 @@ function fetchBackend(endpoint, method, controller, data = {}, params = {}) {
 
 
     }).catch((error) => {
+
         if (error.code == "ERR_CANCELED") {
             return { "status": "error" }
         } else {
