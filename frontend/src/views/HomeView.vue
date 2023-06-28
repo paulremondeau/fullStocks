@@ -55,7 +55,7 @@ let controller = new AbortController();
 ///// States /////
 const dataStatsTable = ref([])
 const dataLineChart = ref([])
-const selectedSymbols = ref(['AAPL'])
+const selectedSymbols = ref(['AAPL', 'MSFT', 'META'])
 const availableSymbols = ref([])
 const showPerformance = ref(true)
 
