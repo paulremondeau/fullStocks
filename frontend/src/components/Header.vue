@@ -67,7 +67,8 @@ function assignMarketData(data) {
     }
 
     .market {
-        width: 87vw
+        width: 87vw;
+        height: 100%;
     }
 
     a {
