@@ -19,6 +19,8 @@
 import { ref, watch, computed } from 'vue'
 import { Duration } from "luxon";
 
+
+
 ///// Timer /////
 const currentTime = ref(0);
 const updateCurrentTime = () => {
@@ -130,7 +132,7 @@ watch(currentTime, () => {
 
 // Scroll adapts to number of child component to make it look continuous
 $numberOfExhanges: v-bind('numberOfExhanges');
-$animationSpeed: 40s;
+$animationSpeed: 90s;
 $slideWidth: 100px;
 
 // Animation
