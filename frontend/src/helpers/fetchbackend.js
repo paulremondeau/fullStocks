@@ -69,7 +69,7 @@ function fetchBackend(endpoint, method, controller, data = {}, params = {}) {
 
 
     }).catch((error) => {
-
+        console.log(error)
         if (error.code == "ERR_CANCELED") {
             return { "status": "error" }
         } else {
