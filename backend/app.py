@@ -689,6 +689,7 @@ def create_market_state():
 
     """
     data = MarketState.query.all()
+
     if data:
         # Data already exists
 
@@ -699,9 +700,10 @@ def create_market_state():
         if result_from_twelve_data["status"] == "ok":
             date_check = datetime.datetime.now(tz=EUROPE_TIMEZONE).timestamp()
             data_market = result_from_twelve_data["data"]
+            data_market = data_market.drop_duplicates(subset=["exchange"])
             for data_exchange in data_market.iloc:
                 # Adding each market one by one
-
+                logger.info(data_market["exchange"].value_counts())
                 db.session.add(
                     MarketState(
                         exchange=data_exchange["exchange"],
